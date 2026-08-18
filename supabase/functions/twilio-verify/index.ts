@@ -27,15 +27,16 @@ serve(async (req) => {
     const userClient = createClient(url, anonKey, {
       global: { headers: { Authorization: authHeader } },
     });
-    const { data: claimsData, error: claimsError } = await userClient.auth.getClaims(
-      authHeader.replace('Bearer ', ''),
-    );
-    if (claimsError || !claimsData?.claims?.sub) {
+    const { data: userData, error: userErr } = await userClient.auth.getUser();
+    if (userErr || !userData?.user?.id) {
+      console.error('twilio-verify auth failed:', userErr?.message);
       return new Response(JSON.stringify({ ok: false, message: 'Unauthorized', checks: [] }), {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-    const { data: isAdmin } = await admin.rpc('is_admin', { _user_id: claimsData.claims.sub });
+    const userId = userData.user.id;
+    const { data: isAdmin, error: roleErr } = await admin.rpc('is_admin', { _user_id: userId });
+    if (roleErr) console.error('twilio-verify is_admin error:', roleErr.message);
     if (!isAdmin) {
       return new Response(JSON.stringify({ ok: false, message: 'Forbidden', checks: [] }), {
         status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -44,10 +45,11 @@ serve(async (req) => {
 
 
 
-    const { data: rows } = await admin
+    const { data: rows, error: secretsErr } = await admin
       .from('app_secrets')
       .select('key,value')
       .in('key', ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_PHONE_NUMBER']);
+    if (secretsErr) console.error('twilio-verify app_secrets error:', secretsErr.message);
 
     const map = new Map((rows || []).map((r: any) => [r.key, r.value]));
     const sid = (map.get('TWILIO_ACCOUNT_SID') || Deno.env.get('TWILIO_ACCOUNT_SID') || '').trim();
@@ -140,10 +142,11 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (e: any) {
+    console.error('twilio-verify fatal error:', e?.message, e?.stack);
     return new Response(
       JSON.stringify({
         ok: false,
-        message: 'We could not run the verification right now. Please try again in a moment.',
+        message: `We could not run the verification right now: ${e?.message ?? 'unknown error'}`,
         checks: [],
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
