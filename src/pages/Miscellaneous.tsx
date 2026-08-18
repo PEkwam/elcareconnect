@@ -144,7 +144,7 @@ const Miscellaneous = () => {
           </Button>
         </SheetTrigger>
         <SheetContent side="right" className="w-full sm:w-[500px] p-0">
-          <OfficerChat agentEmail={user?.email || 'agent@el.com'} />
+          <OfficerChat agentEmail={user?.email || 'agent@careconnect.com'} />
         </SheetContent>
       </Sheet>
     </div>

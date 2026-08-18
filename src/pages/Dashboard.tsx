@@ -342,7 +342,7 @@ const Dashboard = () => {
           </ParticleButton>
         </SheetTrigger>
         <SheetContent side="right" className="w-[380px] p-0 border-l-2 border-primary/20 shadow-2xl">
-          <OfficerChat agentEmail={user?.email || 'agent@el.com'} />
+          <OfficerChat agentEmail={user?.email || 'agent@careconnect.com'} />
         </SheetContent>
       </Sheet>
     </div>
