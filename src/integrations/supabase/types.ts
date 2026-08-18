@@ -27,6 +27,7 @@ export type Database = {
           start_time: string
           status: string | null
           updated_at: string | null
+          user_id: string | null
         }
         Insert: {
           agent_email: string
@@ -40,6 +41,7 @@ export type Database = {
           start_time: string
           status?: string | null
           updated_at?: string | null
+          user_id?: string | null
         }
         Update: {
           agent_email?: string
@@ -53,6 +55,7 @@ export type Database = {
           start_time?: string
           status?: string | null
           updated_at?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -64,6 +67,7 @@ export type Database = {
           proficiency_level: number | null
           skill_type: string
           updated_at: string | null
+          user_id: string | null
         }
         Insert: {
           agent_email: string
@@ -72,6 +76,7 @@ export type Database = {
           proficiency_level?: number | null
           skill_type: string
           updated_at?: string | null
+          user_id?: string | null
         }
         Update: {
           agent_email?: string
@@ -80,6 +85,7 @@ export type Database = {
           proficiency_level?: number | null
           skill_type?: string
           updated_at?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
