@@ -10,7 +10,7 @@ const Index = () => {
       <div className="container mx-auto px-6 py-12">
         <div className="text-center mb-12">
           <h1 className="text-6xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent mb-6">
-            ELVoice
+            Care Connect
           </h1>
           <div className="flex justify-center">
             <Button asChild size="lg" className="px-8 py-3 text-lg font-semibold">
