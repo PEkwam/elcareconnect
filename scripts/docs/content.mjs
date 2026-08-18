@@ -9,7 +9,7 @@ export const livingSections = [
     title: "Active Directory (SAML SSO) Setup",
     sourceFiles: ["src/components/dashboard/ActiveDirectorySetup.tsx"],
     intro:
-      "The Active Directory configurator (Setup → People → Active Directory) provides a guided, auto-validated workflow for connecting EL Calls to a corporate IdP. Implementation: src/components/dashboard/ActiveDirectorySetup.tsx.",
+      "The Active Directory configurator (Setup → People → Active Directory) provides a guided, auto-validated workflow for connecting Care Connect to a corporate IdP. Implementation: src/components/dashboard/ActiveDirectorySetup.tsx.",
     subsections: [
       {
         title: "18.1 Supported IdP Types",
@@ -54,9 +54,9 @@ export const livingSections = [
       {
         title: "18.6 Service Provider Constants",
         bullets: [
-          "Entity ID: https://elcalls.lovable.app/saml/metadata",
-          "ACS / Reply URL: https://elcalls.lovable.app/saml/acs",
-          "Single Logout URL: https://elcalls.lovable.app/saml/slo",
+          "Entity ID: https://elcareconnect.lovable.app/saml/metadata",
+          "ACS / Reply URL: https://elcareconnect.lovable.app/saml/acs",
+          "Single Logout URL: https://elcareconnect.lovable.app/saml/slo",
           "NameID format: emailAddress",
         ],
       },

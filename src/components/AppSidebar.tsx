@@ -124,7 +124,7 @@ export function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader className="border-b border-sidebar-border">
         <div className="flex items-center gap-2 px-4 py-3">
-          <img src={elLogo} alt="EL" className="h-8 w-8 shrink-0 object-contain" />
+          <img src={elLogo} alt="Care Connect" className="h-8 w-8 shrink-0 object-contain" />
           {!collapsed && (
             <span className="font-bold text-sidebar-foreground">Care Connect</span>
           )}

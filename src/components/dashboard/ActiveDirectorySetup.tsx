@@ -44,16 +44,16 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-const SP_ENTITY_ID = "https://elcalls.lovable.app/saml/metadata";
-const SP_ACS_URL = "https://elcalls.lovable.app/saml/acs";
-const SP_SLO_URL = "https://elcalls.lovable.app/saml/slo";
+const SP_ENTITY_ID = "https://elcareconnect.lovable.app/saml/metadata";
+const SP_ACS_URL = "https://elcareconnect.lovable.app/saml/acs";
+const SP_SLO_URL = "https://elcareconnect.lovable.app/saml/slo";
 const DRAFT_KEY = "el:ad-setup:draft:v1";
 const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const guideSteps = [
   {
     icon: Building2,
-    title: "1. Register EL Calls in your directory",
+    title: "1. Register Care Connect in your directory",
     body: "Create a new Enterprise / SAML application in your IdP (Entra ID, AD FS, Okta, OneLogin, Google Workspace, JumpCloud, …).",
   },
   {
@@ -532,7 +532,7 @@ const ConfigureDialog = ({
           <section className="space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold">Service Provider details (paste into your IdP)</h3>
-              <Badge variant="secondary">EL Calls</Badge>
+              <Badge variant="secondary">Care Connect</Badge>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
               <CopyRow label="Entity ID" value={SP_ENTITY_ID} />
@@ -783,7 +783,7 @@ export const ActiveDirectorySetup = () => {
                 {hasDraft && <Badge variant="outline" className="ml-1">Draft saved</Badge>}
               </div>
               <CardDescription className="max-w-2xl">
-                Connect EL Calls to your corporate directory so staff sign in
+                Connect Care Connect to your corporate directory so staff sign in
                 with their existing work account. Supports Microsoft Entra ID
                 (Azure AD), AD FS, Okta, OneLogin, Google Workspace and any
                 SAML 2.0 IdP. Disabling a user in AD blocks their access here

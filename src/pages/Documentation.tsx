@@ -95,7 +95,7 @@ const Documentation = () => {
 
         <TabsContent value="user">
           <DocViewer
-            title="EL Calls — User Guide"
+            title="Care Connect — User Guide"
             description="Day-to-day usage: sign in, handle calls, run campaigns, manage your profile."
             url={USER_GUIDE}
             icon={<FileText className="h-5 w-5" />}
@@ -106,7 +106,7 @@ const Documentation = () => {
         {isAdmin && (
           <TabsContent value="dev">
             <DocViewer
-              title="EL Calls — Developer Guide"
+              title="Care Connect — Developer Guide"
               description="Architecture, DB schema, edge functions, integrations, and a step-by-step setup checklist."
               url={DEV_GUIDE}
               icon={<Code2 className="h-5 w-5" />}
