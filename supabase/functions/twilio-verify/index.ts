@@ -14,7 +14,10 @@ serve(async (req) => {
   try {
     const url = Deno.env.get('SUPABASE_URL')!;
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY')
+      || Deno.env.get('SUPABASE_PUBLISHABLE_KEY')
+      || Deno.env.get('SB_PUBLISHABLE_KEY')
+      || serviceKey;
     const admin = createClient(url, serviceKey);
 
     // Admin-only: validate JWT and role
