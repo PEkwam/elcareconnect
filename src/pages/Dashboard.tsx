@@ -139,7 +139,7 @@ const Dashboard = () => {
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div className="space-y-2">
               <h1 className="text-4xl font-bold bg-gradient-to-r from-primary via-primary to-accent-foreground bg-clip-text text-transparent">
-                AI Calling Dashboard
+                Care Connect Dashboard
               </h1>
               {user?.email && (
                 <p className="text-base text-muted-foreground flex items-center gap-2">

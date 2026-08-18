@@ -126,7 +126,7 @@ export function AppSidebar() {
         <div className="flex items-center gap-2 px-4 py-3">
           <img src={elLogo} alt="EL" className="h-8 w-8 shrink-0 object-contain" />
           {!collapsed && (
-            <span className="font-bold text-sidebar-foreground">EL Voice</span>
+            <span className="font-bold text-sidebar-foreground">Care Connect</span>
           )}
         </div>
       </SidebarHeader>
