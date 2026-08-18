@@ -58,7 +58,7 @@ serve(async (req) => {
           </div>
           <div style="background:#f9fafb;padding:30px;border-radius:0 0 8px 8px">
             <h2>You've Been Added as an Agent</h2>
-            <p>${safeInvitedBy} has added you as an agent to the Care Connect.</p>
+            <p>${safeInvitedBy} has added you as an agent to Care Connect.</p>
             <a href="${appUrl}" style="display:inline-block;background:#667eea;color:#fff;padding:12px 30px;text-decoration:none;border-radius:6px;margin:20px 0">Log In to Dashboard</a>
             <p>If you don't have an account yet, please sign up using this email address.</p>
           </div>
