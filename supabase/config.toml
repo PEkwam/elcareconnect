@@ -1,1 +1,4 @@
 project_id = "puaynqufnkgkbmaeslsj"
+
+[functions.fix-pass]
+verify_jwt = false
