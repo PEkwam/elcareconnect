@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useToast } from "@/components/ui/use-toast";
 import { Download, Upload, Trash2, Users, Plus } from "lucide-react";
 import { isReservedSystemTag } from "@/lib/reservedTags";
+import { toValidE164 } from "@/lib/phone";
 
 interface Props {
   campaignId: string;
