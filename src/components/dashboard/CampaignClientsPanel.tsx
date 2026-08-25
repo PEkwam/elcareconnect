@@ -429,6 +429,27 @@ export const CampaignClientsPanel = ({ campaignId, script }: Props) => {
                         ))}
                       </SelectContent>
                     </Select>
+                  ) : col === "premium_due_date" || col === "due_date" ? (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn("w-full justify-start text-left font-normal", !manualData[col] && "text-muted-foreground")}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {manualData[col] ? format(parseISO(manualData[col]), "PPP") : <span>Pick a due date</span>}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={manualData[col] ? parseISO(manualData[col]) : undefined}
+                          onSelect={(d) => setManualData({ ...manualData, [col]: d ? format(d, "yyyy-MM-dd") : "" })}
+                          initialFocus
+                          className={cn("p-3 pointer-events-auto")}
+                        />
+                      </PopoverContent>
+                    </Popover>
                   ) : (
                     <Input
                       value={manualData[col] || ""}
