@@ -89,15 +89,16 @@ export const AgentStatusWidget = () => {
       })
       .subscribe();
 
-    // Update durations every minute
+    // Update durations periodically (paused while offline)
     const interval = setInterval(() => {
-      if (status?.session_started_at) {
-        setSessionDuration(formatDuration(status.session_started_at));
+      if (status?.status === 'offline') {
+        setSessionDuration("0h 0m");
+        setStatusDuration("");
+        return;
       }
-      if (status?.current_status_started_at) {
-        setStatusDuration(formatDuration(status.current_status_started_at));
-      }
-    }, 60000);
+      setSessionDuration(status?.session_started_at ? formatDuration(status.session_started_at) : "0h 0m");
+      setStatusDuration(status?.current_status_started_at ? formatDuration(status.current_status_started_at) : "");
+    }, 15000);
 
     return () => {
       supabase.removeChannel(channel);
@@ -116,13 +117,14 @@ export const AgentStatusWidget = () => {
 
     if (!error && data) {
       setStatus(data);
-      // Calculate initial durations
-      if (data.session_started_at) {
-        setSessionDuration(formatDuration(data.session_started_at));
+      // Offline means no session: timers reset and stop counting
+      if (data.status === 'offline') {
+        setSessionDuration("0h 0m");
+        setStatusDuration("");
+        return;
       }
-      if (data.current_status_started_at) {
-        setStatusDuration(formatDuration(data.current_status_started_at));
-      }
+      setSessionDuration(data.session_started_at ? formatDuration(data.session_started_at) : "0h 0m");
+      setStatusDuration(data.current_status_started_at ? formatDuration(data.current_status_started_at) : "");
     }
   };
 
@@ -149,6 +151,7 @@ export const AgentStatusWidget = () => {
     }
     if (newStatus === 'offline') {
       updateData.session_started_at = null;
+      updateData.current_status_started_at = null;
     }
 
     // Upsert to handle case where row doesn't exist yet
@@ -196,7 +199,7 @@ export const AgentStatusWidget = () => {
               ? `${BREAK_TYPES.find(b => b.key === status.break_type)?.label || 'Break'}`
               : config.label}
           </Badge>
-          {statusDuration && (
+          {currentStatus !== 'offline' && statusDuration && (
             <span className="text-xs text-muted-foreground">{statusDuration}</span>
           )}
           <ChevronDown className="h-3 w-3 text-muted-foreground" />
@@ -205,7 +208,7 @@ export const AgentStatusWidget = () => {
       <DropdownMenuContent align="end" className="w-56 z-50 bg-popover border border-border shadow-lg">
         <DropdownMenuLabel className="flex items-center justify-between">
           <span>My Status</span>
-          {status?.session_started_at && (
+          {currentStatus !== 'offline' && status?.session_started_at && (
             <span className="text-xs text-muted-foreground flex items-center gap-1">
               <Clock className="h-3 w-3" />
               {sessionDuration}

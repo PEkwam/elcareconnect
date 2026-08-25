@@ -7,7 +7,9 @@ const OFFLINE_THRESHOLD = 60000; // 60 seconds without heartbeat = offline
 const IDLE_THRESHOLD = 5 * 60 * 1000; // 5 minutes of inactivity = away
 
 export const useAgentPresence = () => {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
+  const accessTokenRef = useRef<string | undefined>(undefined);
+  accessTokenRef.current = session?.access_token;
   const heartbeatRef = useRef<NodeJS.Timeout | null>(null);
   const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isAgentRef = useRef(false);
@@ -60,7 +62,7 @@ export const useAgentPresence = () => {
 
       const now = new Date().toISOString();
       currentStatusRef.current = status;
-      
+
       await supabase
         .from('agent_status')
         .upsert({
@@ -68,8 +70,9 @@ export const useAgentPresence = () => {
           agent_email: user.email,
           status,
           updated_at: now,
-          session_started_at: status === 'available' ? now : (status === 'offline' ? null : undefined),
-          current_status_started_at: now,
+          // Going offline clears the session so timers reset and stop counting.
+          session_started_at: status === 'offline' ? null : (status === 'available' ? now : undefined),
+          current_status_started_at: status === 'offline' ? null : now,
         }, { onConflict: 'agent_email' });
         
       console.log(`Agent presence updated: ${user.email} -> ${status}`);
@@ -124,20 +127,34 @@ export const useAgentPresence = () => {
 
   const handleBeforeUnload = useCallback(() => {
     if (!user?.email || !isAgentRef.current) return;
-    
-    // Use sendBeacon for reliable offline status on page close
-    const payload = JSON.stringify({
-      user_id: user.id,
-      agent_email: user.email,
-      status: 'offline',
-    });
-    
-    // Best effort to set offline - sendBeacon is more reliable for unload events
-    navigator.sendBeacon?.(
-      `https://prtvithyqpepdyaglzpg.supabase.co/rest/v1/agent_status?agent_email=eq.${encodeURIComponent(user.email)}`,
-      payload
-    );
-  }, [user?.email, user?.id]);
+
+    const url = import.meta.env.VITE_SUPABASE_URL;
+    const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+    const token = accessTokenRef.current;
+    if (!url || !anonKey || !token) return;
+
+    // keepalive fetch survives page unload and lets us send auth headers
+    // (sendBeacon cannot), so RLS accepts the write.
+    fetch(
+      `${url}/rest/v1/agent_status?agent_email=eq.${encodeURIComponent(user.email)}`,
+      {
+        method: 'PATCH',
+        keepalive: true,
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: anonKey,
+          Authorization: `Bearer ${token}`,
+          Prefer: 'return=minimal',
+        },
+        body: JSON.stringify({
+          status: 'offline',
+          session_started_at: null,
+          current_status_started_at: null,
+          updated_at: new Date().toISOString(),
+        }),
+      }
+    ).catch(() => {});
+  }, [user?.email]);
 
   const handleUserActivity = useCallback(() => {
     resetIdleTimer();
@@ -153,11 +170,16 @@ export const useAgentPresence = () => {
         // Respect any existing status (away, on_break, on_call) the user previously set.
         const { data: existing } = await supabase
           .from('agent_status')
-          .select('status')
+          .select('status, updated_at')
           .eq('agent_email', user!.email!)
           .maybeSingle();
 
-        if (!existing || existing.status === 'offline') {
+        // Stale row (browser closed without a clean offline write) counts as a new session.
+        const stale = existing?.updated_at
+          ? Date.now() - new Date(existing.updated_at).getTime() > OFFLINE_THRESHOLD
+          : true;
+
+        if (!existing || existing.status === 'offline' || stale) {
           await updatePresence('available');
           currentStatusRef.current = 'available';
         } else {

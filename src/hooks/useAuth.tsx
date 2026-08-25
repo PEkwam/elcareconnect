@@ -30,7 +30,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (roleData && roleData.length > 0) {
         await supabase
           .from('agent_status')
-          .update({ status: 'offline', updated_at: new Date().toISOString() })
+          .update({
+            status: 'offline',
+            session_started_at: null,
+            current_status_started_at: null,
+            updated_at: new Date().toISOString(),
+          })
           .eq('agent_email', userEmail);
       }
     } catch (error) {
