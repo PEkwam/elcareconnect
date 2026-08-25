@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/components/ui/use-toast";
 import { Download, Upload, Trash2, Users, Plus } from "lucide-react";
@@ -77,9 +78,27 @@ export const CampaignClientsPanel = ({ campaignId, script }: Props) => {
   // Manual add form
   const [manualOpen, setManualOpen] = useState(false);
   const [manualData, setManualData] = useState<Record<string, string>>({});
+  // Product types come from the Setup page catalog so manual adds stay consistent
+  const [productTypes, setProductTypes] = useState<{ id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from("product_types")
+        .select("id,name")
+        .eq("is_active", true)
+        .order("name");
+      setProductTypes((data as { id: string; name: string }[]) || []);
+    })();
+  }, []);
 
   const scriptTags = useMemo(() => extractTags(script).filter(t => !isReservedSystemTag(t) && !["policy_number"].includes(t)), [script]);
   const columns = useMemo(() => [...DEFAULT_COLUMNS, ...scriptTags], [scriptTags]);
+  // Manual form always offers product type, sourced from the catalog
+  const manualColumns = useMemo(
+    () => (columns.some(c => c === "product_type" || c === "policy_type") ? columns : [...columns, "product_type"]),
+    [columns]
+  );
 
   const load = async () => {
     if (!campaignId) return;
@@ -387,13 +406,29 @@ export const CampaignClientsPanel = ({ campaignId, script }: Props) => {
         <Card className="border-primary/40">
           <CardContent className="p-4 space-y-3">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {columns.map((col) => (
+              {manualColumns.map((col) => (
                 <div key={col} className="grid gap-1">
                   <Label className="text-xs font-mono">{col}{(col === "client_name" || col === "phone") && " *"}</Label>
-                  <Input
-                    value={manualData[col] || ""}
-                    onChange={(e) => setManualData({ ...manualData, [col]: e.target.value })}
-                  />
+                  {col === "product_type" || col === "policy_type" ? (
+                    <Select
+                      value={manualData[col] || ""}
+                      onValueChange={(v) => setManualData({ ...manualData, [col]: v })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={productTypes.length ? "Select product type" : "No product types in catalog"} />
+                      </SelectTrigger>
+                      <SelectContent className="bg-popover z-50">
+                        {productTypes.map((pt) => (
+                          <SelectItem key={pt.id} value={pt.name}>{pt.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Input
+                      value={manualData[col] || ""}
+                      onChange={(e) => setManualData({ ...manualData, [col]: e.target.value })}
+                    />
+                  )}
                 </div>
               ))}
             </div>
