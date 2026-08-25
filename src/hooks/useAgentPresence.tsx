@@ -170,11 +170,16 @@ export const useAgentPresence = () => {
         // Respect any existing status (away, on_break, on_call) the user previously set.
         const { data: existing } = await supabase
           .from('agent_status')
-          .select('status')
+          .select('status, updated_at')
           .eq('agent_email', user!.email!)
           .maybeSingle();
 
-        if (!existing || existing.status === 'offline') {
+        // Stale row (browser closed without a clean offline write) counts as a new session.
+        const stale = existing?.updated_at
+          ? Date.now() - new Date(existing.updated_at).getTime() > OFFLINE_THRESHOLD
+          : true;
+
+        if (!existing || existing.status === 'offline' || stale) {
           await updatePresence('available');
           currentStatusRef.current = 'available';
         } else {
