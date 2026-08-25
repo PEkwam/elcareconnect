@@ -98,11 +98,13 @@ export const CampaignClientsPanel = ({ campaignId, script }: Props) => {
 
   const scriptTags = useMemo(() => extractTags(script).filter(t => !isReservedSystemTag(t) && !["policy_number"].includes(t)), [script]);
   const columns = useMemo(() => [...DEFAULT_COLUMNS, ...scriptTags], [scriptTags]);
-  // Manual form always offers product type, sourced from the catalog
-  const manualColumns = useMemo(
-    () => (columns.some(c => c === "product_type" || c === "policy_type") ? columns : [...columns, "product_type"]),
-    [columns]
-  );
+  // Manual form always offers product type and due date, sourced from the catalog/standard fields
+  const manualColumns = useMemo(() => {
+    const extras: string[] = [];
+    if (!columns.some(c => c === "product_type" || c === "policy_type")) extras.push("product_type");
+    if (!columns.some(c => c === "premium_due_date" || c === "due_date")) extras.push("premium_due_date");
+    return [...columns, ...extras];
+  }, [columns]);
 
   const load = async () => {
     if (!campaignId) return;
