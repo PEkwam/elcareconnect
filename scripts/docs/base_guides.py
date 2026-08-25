@@ -91,6 +91,8 @@ def table(head, rows, widths):
         ("TOPPADDING", (0, 0), (-1, -1), 5),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
     ]))
+    t.spaceBefore = 4
+    t.spaceAfter = 10
     return t
 
 
