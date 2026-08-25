@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useToast } from "@/components/ui/use-toast";
 import { Download, Upload, Trash2, Users, Plus } from "lucide-react";
 import { isReservedSystemTag } from "@/lib/reservedTags";
+import { toValidE164 } from "@/lib/phone";
 
 interface Props {
   campaignId: string;
@@ -199,9 +200,13 @@ export const CampaignClientsPanel = ({ campaignId, script }: Props) => {
 
   const upsertRow = async (record: Record<string, string>) => {
     const name = clean(record.client_name || record.name || record.full_name || record.customer_name);
-    const phone = normalizePhone(clean(record.phone));
+    const rawPhone = normalizePhone(clean(record.phone));
     const policy = clean(record.policy_number) || null;
-    if (!name || !phone) throw new Error("client_name and phone are required");
+    if (!name || !rawPhone) throw new Error("client_name and phone are required");
+    const phone = toValidE164(rawPhone);
+    if (!phone) {
+      throw new Error(`Invalid phone number "${rawPhone}". Use a valid local (0246052499) or international (+233246052499) number.`);
+    }
 
     const email = clean(record.email) || null;
     // Accept either product_type or policy_type as the product/policy descriptor
