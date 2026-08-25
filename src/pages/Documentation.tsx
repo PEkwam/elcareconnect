@@ -9,8 +9,8 @@ import { Separator } from "@/components/ui/separator";
 import { useUserRole } from "@/hooks/useUserRole";
 import { docChapters, type DocBlock, type DocChapter } from "@/data/documentation";
 
-const USER_GUIDE = "/docs/EL_Calls_User_Guide.pdf";
-const DEV_GUIDE = "/docs/EL_Calls_Developer_Guide.pdf";
+const USER_GUIDE = "/docs/CareConnect_User_Guide.pdf";
+const DEV_GUIDE = "/docs/CareConnect_Developer_Guide.pdf";
 
 const blockText = (b: DocBlock): string => {
   switch (b.type) {

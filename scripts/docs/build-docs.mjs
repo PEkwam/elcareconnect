@@ -1,4 +1,4 @@
-// Regenerates public/docs/EL_Calls_Developer_Guide.pdf by merging the static
+// Regenerates public/docs/CareConnect_Developer_Guide.pdf by merging the static
 // base PDF with dynamically rendered "Living Sections" defined in content.mjs.
 // Run via `bun run docs:build` or automatically by the Vite docs plugin.
 
@@ -11,8 +11,8 @@ import { livingSections } from "./content.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "../..");
-const BASE_PDF = path.join(ROOT, "docs-src/EL_Calls_Developer_Guide_base.pdf");
-const OUT_PDF = path.join(ROOT, "public/docs/EL_Calls_Developer_Guide.pdf");
+const BASE_PDF = path.join(ROOT, "docs-src/CareConnect_Developer_Guide_base.pdf");
+const OUT_PDF = path.join(ROOT, "public/docs/CareConnect_Developer_Guide.pdf");
 
 function renderAddendum() {
   return new Promise((resolve, reject) => {
