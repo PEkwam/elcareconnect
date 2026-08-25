@@ -9,7 +9,7 @@ export const livingSections = [
     title: "Active Directory (SAML SSO) Setup",
     sourceFiles: ["src/components/dashboard/ActiveDirectorySetup.tsx"],
     intro:
-      "The Active Directory configurator (Setup → People → Active Directory) provides a guided, auto-validated workflow for connecting Care Connect to a corporate IdP. Implementation: src/components/dashboard/ActiveDirectorySetup.tsx.",
+      "The Active Directory configurator (Setup > People > Active Directory) provides a guided, auto-validated workflow for connecting Care Connect to a corporate IdP. Implementation: src/components/dashboard/ActiveDirectorySetup.tsx.",
     subsections: [
       {
         title: "18.1 Supported IdP Types",
