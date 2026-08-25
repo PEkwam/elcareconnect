@@ -125,20 +125,34 @@ export const useAgentPresence = () => {
 
   const handleBeforeUnload = useCallback(() => {
     if (!user?.email || !isAgentRef.current) return;
-    
-    // Use sendBeacon for reliable offline status on page close
-    const payload = JSON.stringify({
-      user_id: user.id,
-      agent_email: user.email,
-      status: 'offline',
-    });
-    
-    // Best effort to set offline - sendBeacon is more reliable for unload events
-    navigator.sendBeacon?.(
-      `https://prtvithyqpepdyaglzpg.supabase.co/rest/v1/agent_status?agent_email=eq.${encodeURIComponent(user.email)}`,
-      payload
-    );
-  }, [user?.email, user?.id]);
+
+    const url = import.meta.env.VITE_SUPABASE_URL;
+    const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+    const token = accessTokenRef.current;
+    if (!url || !anonKey || !token) return;
+
+    // keepalive fetch survives page unload and lets us send auth headers
+    // (sendBeacon cannot), so RLS accepts the write.
+    fetch(
+      `${url}/rest/v1/agent_status?agent_email=eq.${encodeURIComponent(user.email)}`,
+      {
+        method: 'PATCH',
+        keepalive: true,
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: anonKey,
+          Authorization: `Bearer ${token}`,
+          Prefer: 'return=minimal',
+        },
+        body: JSON.stringify({
+          status: 'offline',
+          session_started_at: null,
+          current_status_started_at: null,
+          updated_at: new Date().toISOString(),
+        }),
+      }
+    ).catch(() => {});
+  }, [user?.email]);
 
   const handleUserActivity = useCallback(() => {
     resetIdleTimer();
