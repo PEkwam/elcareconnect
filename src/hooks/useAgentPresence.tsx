@@ -60,7 +60,7 @@ export const useAgentPresence = () => {
 
       const now = new Date().toISOString();
       currentStatusRef.current = status;
-      
+
       await supabase
         .from('agent_status')
         .upsert({
@@ -68,8 +68,9 @@ export const useAgentPresence = () => {
           agent_email: user.email,
           status,
           updated_at: now,
-          session_started_at: status === 'available' ? now : (status === 'offline' ? null : undefined),
-          current_status_started_at: now,
+          // Going offline clears the session so timers reset and stop counting.
+          session_started_at: status === 'offline' ? null : now,
+          current_status_started_at: status === 'offline' ? null : now,
         }, { onConflict: 'agent_email' });
         
       console.log(`Agent presence updated: ${user.email} -> ${status}`);
