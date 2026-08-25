@@ -69,7 +69,7 @@ export const useAgentPresence = () => {
           status,
           updated_at: now,
           // Going offline clears the session so timers reset and stop counting.
-          session_started_at: status === 'offline' ? null : now,
+          session_started_at: status === 'offline' ? null : (status === 'available' ? now : undefined),
           current_status_started_at: status === 'offline' ? null : now,
         }, { onConflict: 'agent_email' });
         
