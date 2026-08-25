@@ -1,14 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { format, parseISO } from "date-fns";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/components/ui/use-toast";
-import { Download, Upload, Trash2, Users, Plus } from "lucide-react";
+import { CalendarIcon, Download, Upload, Trash2, Users, Plus } from "lucide-react";
 import { isReservedSystemTag } from "@/lib/reservedTags";
 import { toValidE164 } from "@/lib/phone";
 
@@ -94,11 +98,13 @@ export const CampaignClientsPanel = ({ campaignId, script }: Props) => {
 
   const scriptTags = useMemo(() => extractTags(script).filter(t => !isReservedSystemTag(t) && !["policy_number"].includes(t)), [script]);
   const columns = useMemo(() => [...DEFAULT_COLUMNS, ...scriptTags], [scriptTags]);
-  // Manual form always offers product type, sourced from the catalog
-  const manualColumns = useMemo(
-    () => (columns.some(c => c === "product_type" || c === "policy_type") ? columns : [...columns, "product_type"]),
-    [columns]
-  );
+  // Manual form always offers product type and due date, sourced from the catalog/standard fields
+  const manualColumns = useMemo(() => {
+    const extras: string[] = [];
+    if (!columns.some(c => c === "product_type" || c === "policy_type")) extras.push("product_type");
+    if (!columns.some(c => c === "premium_due_date" || c === "due_date")) extras.push("premium_due_date");
+    return [...columns, ...extras];
+  }, [columns]);
 
   const load = async () => {
     if (!campaignId) return;
@@ -423,6 +429,27 @@ export const CampaignClientsPanel = ({ campaignId, script }: Props) => {
                         ))}
                       </SelectContent>
                     </Select>
+                  ) : col === "premium_due_date" || col === "due_date" ? (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn("w-full justify-start text-left font-normal", !manualData[col] && "text-muted-foreground")}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {manualData[col] ? format(parseISO(manualData[col]), "PPP") : <span>Pick a due date</span>}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={manualData[col] ? parseISO(manualData[col]) : undefined}
+                          onSelect={(d) => setManualData({ ...manualData, [col]: d ? format(d, "yyyy-MM-dd") : "" })}
+                          initialFocus
+                          className={cn("p-3 pointer-events-auto")}
+                        />
+                      </PopoverContent>
+                    </Popover>
                   ) : (
                     <Input
                       value={manualData[col] || ""}
