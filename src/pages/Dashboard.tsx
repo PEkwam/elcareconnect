@@ -273,17 +273,17 @@ const Dashboard = () => {
         </div>
 
         {/* Main Content Tabs */}
-        <Tabs defaultValue="analytics" className="space-y-6 animate-scale-in">
+        <Tabs defaultValue="campaigns" className="space-y-6 animate-scale-in">
           <TabsList className="grid w-full grid-cols-5 h-12 rounded-xl bg-gradient-to-r from-muted to-muted/50 p-1 shadow-md">
-            <TabsTrigger data-tour="analytics-tab" value="analytics" className="gap-2 text-sm data-[state=active]:gradient-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all duration-300">
-              <Activity className="h-4 w-4" />
-              <span className="hidden sm:inline">Analytics</span>
-              <span className="sm:hidden">Analytics</span>
-            </TabsTrigger>
             <TabsTrigger data-tour="campaigns-tab" value="campaigns" className="gap-2 text-sm data-[state=active]:gradient-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all duration-300">
               <Calendar className="h-4 w-4" />
               <span className="hidden sm:inline">Campaigns</span>
               <span className="sm:hidden">Campaigns</span>
+            </TabsTrigger>
+            <TabsTrigger data-tour="clients-tab" value="clients" className="gap-2 text-sm data-[state=active]:gradient-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all duration-300">
+              <Users className="h-4 w-4" />
+              <span className="hidden sm:inline">Clients</span>
+              <span className="sm:hidden">Clients</span>
             </TabsTrigger>
             <TabsTrigger data-tour="calls-tab" value="calls" className="gap-2 text-sm data-[state=active]:gradient-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all duration-300">
               <Phone className="h-4 w-4" />
@@ -295,20 +295,19 @@ const Dashboard = () => {
               <span className="hidden sm:inline">Appointments</span>
               <span className="sm:hidden">Appts</span>
             </TabsTrigger>
-            <TabsTrigger data-tour="clients-tab" value="clients" className="gap-2 text-sm data-[state=active]:gradient-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all duration-300">
-              <Users className="h-4 w-4" />
-              <span className="hidden sm:inline">Clients</span>
-              <span className="sm:hidden">Clients</span>
+            <TabsTrigger data-tour="analytics-tab" value="analytics" className="gap-2 text-sm data-[state=active]:gradient-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all duration-300">
+              <Activity className="h-4 w-4" />
+              <span className="hidden sm:inline">Analytics</span>
+              <span className="sm:hidden">Analytics</span>
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="analytics" className="space-y-4">
-            <RealtimeAnalyticsDashboard />
-            <SentimentTrendChart />
-          </TabsContent>
-
           <TabsContent value="campaigns" className="space-y-4">
             <CampaignsTab />
+          </TabsContent>
+
+          <TabsContent value="clients" className="space-y-4">
+            <ClientsTab onStatsUpdate={fetchStats} />
           </TabsContent>
 
           <TabsContent value="calls" className="space-y-4">
@@ -322,8 +321,9 @@ const Dashboard = () => {
             <AppointmentsTab />
           </TabsContent>
 
-          <TabsContent value="clients" className="space-y-4">
-            <ClientsTab onStatsUpdate={fetchStats} />
+          <TabsContent value="analytics" className="space-y-4">
+            <RealtimeAnalyticsDashboard />
+            <SentimentTrendChart />
           </TabsContent>
         </Tabs>
       </div>
