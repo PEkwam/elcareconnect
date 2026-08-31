@@ -72,7 +72,7 @@ export const AgentStatusWidget = () => {
   const [statusDuration, setStatusDuration] = useState<string>("");
 
   useEffect(() => {
-    if (!user?.email) return;
+    if (!user?.email || !user?.id) return;
 
     fetchStatus();
 
@@ -83,7 +83,7 @@ export const AgentStatusWidget = () => {
         event: '*',
         schema: 'public',
         table: 'agent_status',
-        filter: `agent_email=eq.${user.email}`
+        filter: `user_id=eq.${user.id}`
       }, () => {
         fetchStatus();
       })
@@ -104,15 +104,15 @@ export const AgentStatusWidget = () => {
       supabase.removeChannel(channel);
       clearInterval(interval);
     };
-  }, [user?.email, status?.session_started_at, status?.current_status_started_at]);
+  }, [user?.email, user?.id, status?.session_started_at, status?.current_status_started_at]);
 
   const fetchStatus = async () => {
-    if (!user?.email) return;
+    if (!user?.email || !user?.id) return;
 
     const { data, error } = await supabase
       .from('agent_status')
       .select('status, break_type, session_started_at, current_status_started_at, total_time_available_seconds, total_time_on_call_seconds, total_time_on_break_seconds')
-      .eq('agent_email', user.email)
+      .eq('user_id', user.id)
       .maybeSingle();
 
     if (!error && data) {
