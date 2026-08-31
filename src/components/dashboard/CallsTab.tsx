@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Play, Phone, ExternalLink, Trash2, RefreshCw, Brain, Mic } from "lucide-react";
+import { Play, Phone, ExternalLink, Trash2, RefreshCw, Brain, Mic, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { SentimentBadge } from "./SentimentBadge";
@@ -44,11 +44,18 @@ interface CallsTabProps {
   onStatsUpdate: () => void;
 }
 
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
+
 const CallsTab = ({ onStatsUpdate }: CallsTabProps) => {
   const [calls, setCalls] = useState<OutboundCall[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedCall, setSelectedCall] = useState<OutboundCall | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalCount, setTotalCount] = useState(0);
   const { toast } = useToast();
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
   useEffect(() => {
     fetchCalls();
@@ -65,7 +72,8 @@ const CallsTab = ({ onStatsUpdate }: CallsTabProps) => {
     reconcile();
     const id = setInterval(reconcile, 30000);
     return () => clearInterval(id);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, pageSize]);
 
   useRealtimeRefresh(["outbound_calls"], () => {
     fetchCalls();
@@ -74,17 +82,26 @@ const CallsTab = ({ onStatsUpdate }: CallsTabProps) => {
 
   const fetchCalls = async () => {
     try {
-      const { data, error } = await supabase
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+      const { data, error, count } = await supabase
         .from("outbound_calls")
         .select(`
           *,
           clients (name, policy_number),
           call_campaigns (name, type)
-        `)
-        .order("scheduled_at", { ascending: false });
+        `, { count: "exact" })
+        .order("scheduled_at", { ascending: false })
+        .range(from, to);
 
       if (error) throw error;
       setCalls(data as OutboundCall[] || []);
+      const total = count ?? 0;
+      setTotalCount(total);
+      // If the current page fell out of range (e.g. after Clear All), step back.
+      if (total > 0 && from >= total) {
+        setPage(Math.ceil(total / pageSize));
+      }
     } catch (error) {
       console.error("Error fetching calls:", error);
       toast({
@@ -536,6 +553,65 @@ const CallsTab = ({ onStatsUpdate }: CallsTabProps) => {
               </div>
             )}
           </div>
+          {totalCount > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span>
+                  Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, totalCount)} of {totalCount} calls
+                </span>
+                <Select
+                  value={String(pageSize)}
+                  onValueChange={(v) => { setPageSize(Number(v)); setPage(1); }}
+                >
+                  <SelectTrigger className="w-[110px] h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PAGE_SIZE_OPTIONS.map((n) => (
+                      <SelectItem key={n} value={String(n)}>{n} / page</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(1)}
+                  disabled={page <= 1 || isLoading}
+                >
+                  <ChevronsLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page <= 1 || isLoading}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-sm text-muted-foreground px-2">
+                  Page {page} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page >= totalPages || isLoading}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(totalPages)}
+                  disabled={page >= totalPages || isLoading}
+                >
+                  <ChevronsRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
         </TabsContent>
