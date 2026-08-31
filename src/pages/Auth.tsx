@@ -136,7 +136,7 @@ const Auth = () => {
           const { error: profileError } = await supabase
             .from('profiles')
             .update({ display_name: displayName.trim() })
-            .eq('id', user.id);
+            .eq('user_id', user.id);
 
           if (profileError) {
             console.error('Error updating profile:', profileError);

@@ -53,8 +53,8 @@ export function AppSidebar() {
       const { data } = await supabase
         .from("profiles")
         .select("display_name")
-        .eq("id", user.id)
-        .single();
+        .eq("user_id", user.id)
+        .maybeSingle();
       
       if (data?.display_name) {
         setDisplayName(data.display_name);
