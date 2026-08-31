@@ -1,7 +1,9 @@
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ShieldCheck, Package, Award, Bell, Globe, Users, Phone, Music, ListOrdered, KeyRound, Megaphone, Radio, UserCog, Mic2, PhoneCall, Library, Building2 } from "lucide-react";
+import { useMemo, useState, type ComponentType } from "react";
+import {
+  Users, ShieldCheck, Award, Building2, Globe, Music, Radio, ListOrdered,
+  Phone, Bell, Package, Megaphone, KeyRound, type LucideIcon,
+} from "lucide-react";
 import { ActiveDirectorySetup } from "@/components/dashboard/ActiveDirectorySetup";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { AgentManagement } from "@/components/dashboard/AgentManagement";
 import ProductTypesTab from "@/components/dashboard/ProductTypesTab";
 import { AgentSkillsManager } from "@/components/dashboard/AgentSkillsManager";
@@ -16,20 +18,98 @@ import { CampaignTypesManager } from "@/components/dashboard/CampaignTypesManage
 import { SystemRecordingsManager } from "@/components/dashboard/SystemRecordingsManager";
 import { SipTrunkManager } from "@/components/dashboard/SipTrunkManager";
 import { useUserRole } from "@/hooks/useUserRole";
+import { cn } from "@/lib/utils";
 
-const groupTriggerCls =
-  "gap-2 px-5 h-10 rounded-full font-medium text-muted-foreground hover:text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md data-[state=active]:shadow-primary/30 transition-all duration-300";
+interface SetupItem {
+  id: string;
+  label: string;
+  description: string;
+  icon: LucideIcon;
+  component: ComponentType;
+  adminOnly?: boolean;
+}
 
-const subTriggerCls =
-  "gap-2 data-[state=active]:bg-primary/10 data-[state=active]:text-primary transition-all duration-200";
+interface SetupGroup {
+  id: string;
+  label: string;
+  items: SetupItem[];
+}
+
+const GROUPS: SetupGroup[] = [
+  {
+    id: "people",
+    label: "People",
+    items: [
+      { id: "users", label: "Users & Roles", description: "Invite users and manage roles and permissions.", icon: Users, component: UserRoleManagement },
+      { id: "agents", label: "Agents", description: "Configure agent profiles and availability.", icon: ShieldCheck, component: AgentManagement },
+      { id: "skills", label: "Skills", description: "Define skills used for smart call routing.", icon: Award, component: AgentSkillsManager },
+      { id: "active-directory", label: "Active Directory", description: "Connect and sync your directory (SSO / SAML).", icon: Building2, component: ActiveDirectorySetup, adminOnly: true },
+    ],
+  },
+  {
+    id: "voice",
+    label: "Voice & Languages",
+    items: [
+      { id: "languages", label: "Languages", description: "Manage supported call languages.", icon: Globe, component: LanguageManagement },
+      { id: "audio", label: "Audio", description: "Upload language audio prompts.", icon: Music, component: LanguageAudioUploader },
+      { id: "system-recordings", label: "System Recordings", description: "Manage system-wide voice recordings.", icon: Radio, component: SystemRecordingsManager },
+      { id: "ivr", label: "IVR Menu", description: "Build the interactive voice response menu.", icon: ListOrdered, component: IVRMenuManager },
+    ],
+  },
+  {
+    id: "telephony",
+    label: "Telephony",
+    items: [
+      { id: "calls", label: "Call Settings", description: "Caller ID, recording and call behavior.", icon: Phone, component: CallSettingsManager },
+      { id: "escalation", label: "Escalation", description: "Escalation rules and notifications.", icon: Bell, component: EscalationSettings },
+      { id: "sip", label: "SIP Trunks", description: "Manage SIP trunk connections.", icon: Radio, component: SipTrunkManager, adminOnly: true },
+    ],
+  },
+  {
+    id: "catalog",
+    label: "Catalog",
+    items: [
+      { id: "products", label: "Product Types", description: "Manage the product catalog used in campaigns.", icon: Package, component: ProductTypesTab },
+      { id: "campaign-types", label: "Campaign Types", description: "Types of campaigns available when creating campaigns.", icon: Megaphone, component: CampaignTypesManager },
+    ],
+  },
+  {
+    id: "secrets",
+    label: "Secrets",
+    adminOnly: true,
+    items: [
+      { id: "app-secrets", label: "App Secrets", description: "Manage API keys and integration secrets.", icon: KeyRound, component: AppSecretsManager, adminOnly: true },
+    ],
+  },
+] as (SetupGroup & { adminOnly?: boolean })[];
+
+const headingFont = { fontFamily: "'Sora', sans-serif" } as const;
 
 const Setup = () => {
   const { isSuperAdmin } = useUserRole();
+
+  const visibleGroups = useMemo(
+    () =>
+      GROUPS
+        .filter((g) => !(g as any).adminOnly || isSuperAdmin)
+        .map((g) => ({ ...g, items: g.items.filter((i) => !i.adminOnly || isSuperAdmin) })),
+    [isSuperAdmin]
+  );
+
+  const [activeId, setActiveId] = useState("users");
+  const activeItem =
+    visibleGroups.flatMap((g) => g.items).find((i) => i.id === activeId) ??
+    visibleGroups[0]?.items[0];
+  const ActiveComponent = activeItem?.component;
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-secondary/10 to-background">
+    <div className="min-h-screen bg-gradient-to-br from-background via-secondary/10 to-background" style={{ fontFamily: "'Manrope', sans-serif" }}>
       <div className="container mx-auto px-4 py-8 max-w-7xl">
         <div className="mb-8 animate-fade-in">
-          <h1 className="text-4xl font-bold mb-3 bg-gradient-to-r from-primary via-primary to-accent-foreground bg-clip-text text-transparent">
+          <h1
+            className="text-4xl font-bold mb-3 bg-gradient-to-r from-primary via-primary to-accent-foreground bg-clip-text text-transparent"
+            style={headingFont}
+          >
             Setup & Configuration
           </h1>
           <p className="text-base text-muted-foreground flex items-center gap-2">
@@ -38,100 +118,88 @@ const Setup = () => {
           </p>
         </div>
 
-        <Tabs defaultValue="people" className="space-y-6 animate-scale-in">
-          <ScrollArea className="w-full">
-            <TabsList className="inline-flex w-max h-14 rounded-full bg-card/80 backdrop-blur-sm border border-border/50 p-1.5 shadow-lg shadow-primary/5">
-              <TabsTrigger value="people" className={groupTriggerCls}>
-                <UserCog className="h-4 w-4" /> People
-              </TabsTrigger>
-              <TabsTrigger value="voice" className={groupTriggerCls}>
-                <Mic2 className="h-4 w-4" /> Voice & Languages
-              </TabsTrigger>
-              <TabsTrigger value="telephony" className={groupTriggerCls}>
-                <PhoneCall className="h-4 w-4" /> Telephony
-              </TabsTrigger>
-              <TabsTrigger value="catalog" className={groupTriggerCls}>
-                <Library className="h-4 w-4" /> Catalog
-              </TabsTrigger>
-              {isSuperAdmin && (
-                <TabsTrigger value="secrets" className={groupTriggerCls}>
-                  <KeyRound className="h-4 w-4" /> Secrets
-                </TabsTrigger>
-              )}
-            </TabsList>
-            <ScrollBar orientation="horizontal" />
-          </ScrollArea>
+        <div className="flex flex-col md:flex-row w-full bg-card rounded-3xl shadow-[0_20px_50px_hsl(var(--primary)/0.06)] border border-border overflow-hidden animate-scale-in min-h-[720px]">
+          {/* In-page sidebar */}
+          <aside className="md:w-72 shrink-0 bg-muted/30 border-b md:border-b-0 md:border-r border-border flex flex-col">
+            <div className="p-6">
+              <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-6" style={headingFont}>
+                Configuration
+              </h2>
+              <nav className="space-y-7">
+                {visibleGroups.map((group) => (
+                  <div key={group.id}>
+                    <div className="flex items-center gap-2 mb-2.5">
+                      <div
+                        className={cn(
+                          "w-1 h-4 rounded-full",
+                          group.items.some((i) => i.id === activeItem?.id) ? "bg-primary" : "bg-border"
+                        )}
+                      />
+                      <span className="text-xs font-bold text-foreground uppercase tracking-wide" style={headingFont}>
+                        {group.label}
+                      </span>
+                    </div>
+                    <ul className="space-y-1 ml-3">
+                      {group.items.map((item) => {
+                        const isActive = item.id === activeItem?.id;
+                        return (
+                          <li key={item.id}>
+                            <button
+                              onClick={() => setActiveId(item.id)}
+                              className={cn(
+                                "w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors text-left",
+                                isActive
+                                  ? "text-primary bg-primary/10"
+                                  : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                              )}
+                            >
+                              <span className="flex items-center gap-2.5">
+                                <item.icon className="h-4 w-4 shrink-0" />
+                                {item.label}
+                              </span>
+                              {item.adminOnly && (
+                                <span className="px-1.5 py-0.5 text-[10px] bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400 rounded-md font-bold uppercase tracking-tighter">
+                                  Admin
+                                </span>
+                              )}
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                ))}
+              </nav>
+            </div>
+          </aside>
 
-          {/* People */}
-          <TabsContent value="people" className="animate-fade-in space-y-4">
-            <Tabs defaultValue="users" className="space-y-4">
-              <TabsList className="bg-muted/40">
-                <TabsTrigger value="users" className={subTriggerCls}><Users className="h-4 w-4" /> Users</TabsTrigger>
-                <TabsTrigger value="agents" className={subTriggerCls}><ShieldCheck className="h-4 w-4" /> Agents</TabsTrigger>
-                <TabsTrigger value="skills" className={subTriggerCls}><Award className="h-4 w-4" /> Skills</TabsTrigger>
-                {isSuperAdmin && (
-                  <TabsTrigger value="active-directory" className={subTriggerCls}><Building2 className="h-4 w-4" /> Active Directory</TabsTrigger>
+          {/* Content area */}
+          <main className="flex-1 flex flex-col min-w-0">
+            <header className="px-6 md:px-10 py-7 border-b border-border">
+              <div className="flex items-center gap-4">
+                {activeItem && (
+                  <div className="p-3 bg-primary/10 text-primary rounded-xl shrink-0">
+                    <activeItem.icon className="h-6 w-6" />
+                  </div>
                 )}
-              </TabsList>
-              <TabsContent value="users"><UserRoleManagement /></TabsContent>
-              <TabsContent value="agents"><AgentManagement /></TabsContent>
-              <TabsContent value="skills"><AgentSkillsManager /></TabsContent>
-              {isSuperAdmin && (
-                <TabsContent value="active-directory"><ActiveDirectorySetup /></TabsContent>
+                <div>
+                  <h2 className="text-2xl font-bold text-foreground tracking-tight" style={headingFont}>
+                    {activeItem?.label}
+                  </h2>
+                  <p className="text-muted-foreground mt-1 text-sm">{activeItem?.description}</p>
+                </div>
+              </div>
+            </header>
+
+            <div className="flex-1 p-4 md:p-8 bg-muted/20 overflow-y-auto">
+              {ActiveComponent && (
+                <div key={activeItem?.id} className="animate-fade-in">
+                  <ActiveComponent />
+                </div>
               )}
-            </Tabs>
-          </TabsContent>
-
-          {/* Voice & Languages */}
-          <TabsContent value="voice" className="animate-fade-in space-y-4">
-            <Tabs defaultValue="languages" className="space-y-4">
-              <TabsList className="bg-muted/40">
-                <TabsTrigger value="languages" className={subTriggerCls}><Globe className="h-4 w-4" /> Languages</TabsTrigger>
-                <TabsTrigger value="audio" className={subTriggerCls}><Music className="h-4 w-4" /> Audio</TabsTrigger>
-                <TabsTrigger value="system-recordings" className={subTriggerCls}><Radio className="h-4 w-4" /> System Recordings</TabsTrigger>
-                <TabsTrigger value="ivr" className={subTriggerCls}><ListOrdered className="h-4 w-4" /> IVR Menu</TabsTrigger>
-              </TabsList>
-              <TabsContent value="languages"><LanguageManagement /></TabsContent>
-              <TabsContent value="audio"><LanguageAudioUploader /></TabsContent>
-              <TabsContent value="system-recordings"><SystemRecordingsManager /></TabsContent>
-              <TabsContent value="ivr"><IVRMenuManager /></TabsContent>
-            </Tabs>
-          </TabsContent>
-
-          {/* Telephony */}
-          <TabsContent value="telephony" className="animate-fade-in space-y-4">
-            <Tabs defaultValue="calls" className="space-y-4">
-              <TabsList className="bg-muted/40">
-                <TabsTrigger value="calls" className={subTriggerCls}><Phone className="h-4 w-4" /> Call Settings</TabsTrigger>
-                <TabsTrigger value="escalation" className={subTriggerCls}><Bell className="h-4 w-4" /> Escalation</TabsTrigger>
-                {isSuperAdmin && (
-                  <TabsTrigger value="sip" className={subTriggerCls}><Radio className="h-4 w-4" /> SIP Trunks</TabsTrigger>
-                )}
-              </TabsList>
-              <TabsContent value="calls"><CallSettingsManager /></TabsContent>
-              <TabsContent value="escalation"><EscalationSettings /></TabsContent>
-              {isSuperAdmin && (
-                <TabsContent value="sip"><SipTrunkManager /></TabsContent>
-              )}
-            </Tabs>
-          </TabsContent>
-
-          {/* Catalog */}
-          <TabsContent value="catalog" className="animate-fade-in space-y-4">
-            <Tabs defaultValue="products" className="space-y-4">
-              <TabsList className="bg-muted/40">
-                <TabsTrigger value="products" className={subTriggerCls}><Package className="h-4 w-4" /> Product Types</TabsTrigger>
-                <TabsTrigger value="campaign-types" className={subTriggerCls}><Megaphone className="h-4 w-4" /> Campaign Types</TabsTrigger>
-              </TabsList>
-              <TabsContent value="products"><ProductTypesTab /></TabsContent>
-              <TabsContent value="campaign-types"><CampaignTypesManager /></TabsContent>
-            </Tabs>
-          </TabsContent>
-
-          {isSuperAdmin && (
-            <TabsContent value="secrets" className="animate-fade-in"><AppSecretsManager /></TabsContent>
-          )}
-        </Tabs>
+            </div>
+          </main>
+        </div>
       </div>
     </div>
   );
