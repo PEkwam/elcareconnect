@@ -37,7 +37,7 @@ export const useAgentPresence = () => {
       const { data: currentStatus } = await supabase
         .from('agent_status')
         .select('status, current_status_started_at')
-        .eq('agent_email', user.email)
+        .eq('user_id', user.id)
         .maybeSingle();
 
       // Don't change status if agent is on a call or break (unless going offline)
@@ -47,7 +47,7 @@ export const useAgentPresence = () => {
         await supabase
           .from('agent_status')
           .update({ updated_at: new Date().toISOString() })
-          .eq('agent_email', user.email);
+          .eq('user_id', user.id);
         return;
       }
 
@@ -56,7 +56,7 @@ export const useAgentPresence = () => {
         await supabase
           .from('agent_status')
           .update({ updated_at: new Date().toISOString() })
-          .eq('agent_email', user.email);
+          .eq('user_id', user.id);
         return;
       }
 
@@ -111,7 +111,7 @@ export const useAgentPresence = () => {
       await supabase
         .from('agent_status')
         .update({ updated_at: new Date().toISOString() })
-        .eq('agent_email', user.email);
+        .eq('user_id', user.id);
     } catch (error) {
       console.error('Error sending heartbeat:', error);
     }
