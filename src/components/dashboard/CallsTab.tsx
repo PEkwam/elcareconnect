@@ -44,11 +44,18 @@ interface CallsTabProps {
   onStatsUpdate: () => void;
 }
 
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
+
 const CallsTab = ({ onStatsUpdate }: CallsTabProps) => {
   const [calls, setCalls] = useState<OutboundCall[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedCall, setSelectedCall] = useState<OutboundCall | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalCount, setTotalCount] = useState(0);
   const { toast } = useToast();
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
   useEffect(() => {
     fetchCalls();
