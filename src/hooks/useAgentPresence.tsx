@@ -160,19 +160,50 @@ export const useAgentPresence = () => {
     resetIdleTimer();
   }, [resetIdleTimer]);
 
+  // Keep latest callbacks in refs so the effect can depend only on the user id.
+  // (Re-running the effect on callback identity changes made the cleanup fire and
+  // immediately flip a logged-in user back to "offline".)
+  const fnRefs = useRef({
+    checkIfAgent,
+    updatePresence,
+    sendHeartbeat,
+    handleVisibilityChange,
+    handleBeforeUnload,
+    resetIdleTimer,
+    handleUserActivity,
+  });
+  fnRefs.current = {
+    checkIfAgent,
+    updatePresence,
+    sendHeartbeat,
+    handleVisibilityChange,
+    handleBeforeUnload,
+    resetIdleTimer,
+    handleUserActivity,
+  };
+
   useEffect(() => {
+    let cancelled = false;
+    const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+    const onActivity = () => fnRefs.current.handleUserActivity();
+    const onVisibility = () => fnRefs.current.handleVisibilityChange();
+    const onUnload = () => fnRefs.current.handleBeforeUnload();
+
     const initPresence = async () => {
-      const isAgent = await checkIfAgent();
+      const isAgent = await fnRefs.current.checkIfAgent();
+      if (cancelled) return;
       isAgentRef.current = isAgent;
-      
+
       if (isAgent) {
         // Only auto-set to available on login if user is currently offline (or has no row).
         // Respect any existing status (away, on_break, on_call) the user previously set.
         const { data: existing } = await supabase
           .from('agent_status')
           .select('status, updated_at')
-          .eq('agent_email', user!.email!)
+          .eq('user_id', user!.id)
           .maybeSingle();
+
+        if (cancelled) return;
 
         // Stale row (browser closed without a clean offline write) counts as a new session.
         const stale = existing?.updated_at
@@ -180,29 +211,20 @@ export const useAgentPresence = () => {
           : true;
 
         if (!existing || existing.status === 'offline' || stale) {
-          await updatePresence('available');
+          await fnRefs.current.updatePresence('available');
           currentStatusRef.current = 'available';
         } else {
           currentStatusRef.current = existing.status;
         }
-        
-        // Start heartbeat
-        heartbeatRef.current = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL);
-        
-        // Start idle detection
-        resetIdleTimer();
-        
-        // Activity events for idle detection
-        const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+
+        heartbeatRef.current = setInterval(() => fnRefs.current.sendHeartbeat(), HEARTBEAT_INTERVAL);
+        fnRefs.current.resetIdleTimer();
+
         activityEvents.forEach(event => {
-          document.addEventListener(event, handleUserActivity, { passive: true });
+          document.addEventListener(event, onActivity, { passive: true });
         });
-        
-        // Listen for visibility changes
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-        
-        // Listen for page close
-        window.addEventListener('beforeunload', handleBeforeUnload);
+        document.addEventListener('visibilitychange', onVisibility);
+        window.addEventListener('beforeunload', onUnload);
       }
     };
 
@@ -211,28 +233,23 @@ export const useAgentPresence = () => {
     }
 
     return () => {
-      if (heartbeatRef.current) {
-        clearInterval(heartbeatRef.current);
-      }
-      if (idleTimerRef.current) {
-        clearTimeout(idleTimerRef.current);
-      }
-      
-      // Remove activity listeners
-      const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+      cancelled = true;
+      if (heartbeatRef.current) clearInterval(heartbeatRef.current);
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+
       activityEvents.forEach(event => {
-        document.removeEventListener(event, handleUserActivity);
+        document.removeEventListener(event, onActivity);
       });
-      
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      
-      // Set offline when component unmounts (logout)
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('beforeunload', onUnload);
+
+      // Set offline when the user actually leaves (logout / unmount).
       if (isAgentRef.current) {
-        updatePresence('offline');
+        fnRefs.current.updatePresence('offline');
       }
     };
-  }, [user?.id, checkIfAgent, updatePresence, sendHeartbeat, handleVisibilityChange, handleBeforeUnload, resetIdleTimer, handleUserActivity]);
+  }, [user?.id]);
+
 
   return { updatePresence, resetIdleTimer };
 };
