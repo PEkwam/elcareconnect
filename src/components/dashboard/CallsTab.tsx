@@ -72,7 +72,8 @@ const CallsTab = ({ onStatsUpdate }: CallsTabProps) => {
     reconcile();
     const id = setInterval(reconcile, 30000);
     return () => clearInterval(id);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, pageSize]);
 
   useRealtimeRefresh(["outbound_calls"], () => {
     fetchCalls();
@@ -81,17 +82,26 @@ const CallsTab = ({ onStatsUpdate }: CallsTabProps) => {
 
   const fetchCalls = async () => {
     try {
-      const { data, error } = await supabase
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+      const { data, error, count } = await supabase
         .from("outbound_calls")
         .select(`
           *,
           clients (name, policy_number),
           call_campaigns (name, type)
-        `)
-        .order("scheduled_at", { ascending: false });
+        `, { count: "exact" })
+        .order("scheduled_at", { ascending: false })
+        .range(from, to);
 
       if (error) throw error;
       setCalls(data as OutboundCall[] || []);
+      const total = count ?? 0;
+      setTotalCount(total);
+      // If the current page fell out of range (e.g. after Clear All), step back.
+      if (total > 0 && from >= total) {
+        setPage(Math.ceil(total / pageSize));
+      }
     } catch (error) {
       console.error("Error fetching calls:", error);
       toast({
