@@ -83,6 +83,7 @@ export const useAgentPresence = () => {
   }, [user?.email, user?.id]);
 
   const resetIdleTimer = useCallback(() => {
+    const wasInactive = Date.now() - lastActivityRef.current >= IDLE_THRESHOLD;
     lastActivityRef.current = Date.now();
     
     // Clear existing idle timer
@@ -90,8 +91,15 @@ export const useAgentPresence = () => {
       clearTimeout(idleTimerRef.current);
     }
 
-    // If currently away, set back to available
-    if ((currentStatusRef.current === 'away' || autoOfflineRef.current) && isAgentRef.current) {
+    // Returning after a long background/idle period starts a fresh session,
+    // even when the browser throttled the idle timeout itself.
+    if (wasInactive && currentStatusRef.current !== 'offline' && isAgentRef.current) {
+      autoOfflineRef.current = true;
+      updatePresence('offline').then(() => {
+        autoOfflineRef.current = false;
+        updatePresence('available');
+      });
+    } else if ((currentStatusRef.current === 'away' || autoOfflineRef.current) && isAgentRef.current) {
       autoOfflineRef.current = false;
       updatePresence('available');
     }
