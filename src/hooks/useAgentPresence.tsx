@@ -7,7 +7,7 @@ const OFFLINE_THRESHOLD = 60000; // 60 seconds without heartbeat = offline
 const IDLE_THRESHOLD = 5 * 60 * 1000; // 5 minutes of inactivity = away
 
 export const useAgentPresence = () => {
-  const { user, session } = useAuth();
+  const { user, session, signOut } = useAuth();
   const accessTokenRef = useRef<string | undefined>(undefined);
   accessTokenRef.current = session?.access_token;
   const heartbeatRef = useRef<NodeJS.Timeout | null>(null);
