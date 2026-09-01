@@ -7,7 +7,7 @@ const OFFLINE_THRESHOLD = 60000; // 60 seconds without heartbeat = offline
 const IDLE_THRESHOLD = 5 * 60 * 1000; // 5 minutes of inactivity = away
 
 export const useAgentPresence = () => {
-  const { user, session } = useAuth();
+  const { user, session, signOut } = useAuth();
   const accessTokenRef = useRef<string | undefined>(undefined);
   accessTokenRef.current = session?.access_token;
   const heartbeatRef = useRef<NodeJS.Timeout | null>(null);
@@ -16,6 +16,22 @@ export const useAgentPresence = () => {
   const lastActivityRef = useRef<number>(Date.now());
   const currentStatusRef = useRef<string>('offline');
   const autoOfflineRef = useRef(false);
+  const signOutRef = useRef(signOut);
+  signOutRef.current = signOut;
+
+  // After the inactivity threshold the agent is marked offline AND signed out,
+  // so the session cannot be silently kept alive by a background tab.
+  const goOfflineAndSignOut = useCallback(async () => {
+    if (currentStatusRef.current !== 'offline') {
+      autoOfflineRef.current = true;
+      await updatePresenceRef.current('offline');
+    }
+    try {
+      const { toast } = await import('sonner');
+      toast.info('You were signed out due to inactivity.');
+    } catch { /* non-fatal */ }
+    await signOutRef.current();
+  }, []);
 
   const checkIfAgent = useCallback(async () => {
     if (!user?.id) return false;
@@ -82,6 +98,9 @@ export const useAgentPresence = () => {
     }
   }, [user?.email, user?.id]);
 
+  const updatePresenceRef = useRef(updatePresence);
+  updatePresenceRef.current = updatePresence;
+
   const resetIdleTimer = useCallback(() => {
     const wasInactive = Date.now() - lastActivityRef.current >= IDLE_THRESHOLD;
     lastActivityRef.current = Date.now();
@@ -91,14 +110,11 @@ export const useAgentPresence = () => {
       clearTimeout(idleTimerRef.current);
     }
 
-    // Returning after a long background/idle period starts a fresh session,
-    // even when the browser throttled the idle timeout itself.
+    // Returning after a long idle period signs the user out instead of
+    // silently starting a fresh presence session.
     if (wasInactive && currentStatusRef.current !== 'offline' && isAgentRef.current) {
-      autoOfflineRef.current = true;
-      updatePresence('offline').then(() => {
-        autoOfflineRef.current = false;
-        updatePresence('available');
-      });
+      goOfflineAndSignOut();
+      return;
     } else if ((currentStatusRef.current === 'away' || autoOfflineRef.current) && isAgentRef.current) {
       autoOfflineRef.current = false;
       updatePresence('available');
@@ -108,12 +124,11 @@ export const useAgentPresence = () => {
     // offline so admins, agents, and supervisors are not shown as available.
     idleTimerRef.current = setTimeout(() => {
       if (isAgentRef.current && currentStatusRef.current !== 'offline') {
-        console.log('Agent idle for 5 minutes - setting to offline');
-        autoOfflineRef.current = true;
-        updatePresence('offline');
+        console.log('Agent idle for 5 minutes - going offline and signing out');
+        goOfflineAndSignOut();
       }
     }, IDLE_THRESHOLD);
-  }, [updatePresence]);
+  }, [updatePresence, goOfflineAndSignOut]);
 
   const sendHeartbeat = useCallback(async () => {
     if (!user?.email || !user?.id || !isAgentRef.current) return;
@@ -121,10 +136,7 @@ export const useAgentPresence = () => {
     // A background tab can throttle the idle timeout while intervals continue.
     // Never let heartbeats keep an inactive session alive indefinitely.
     if (Date.now() - lastActivityRef.current >= IDLE_THRESHOLD) {
-      if (currentStatusRef.current !== 'offline') {
-        autoOfflineRef.current = true;
-        await updatePresence('offline');
-      }
+      await goOfflineAndSignOut();
       return;
     }
 
@@ -136,7 +148,7 @@ export const useAgentPresence = () => {
     } catch (error) {
       console.error('Error sending heartbeat:', error);
     }
-  }, [user?.email, user?.id, updatePresence]);
+  }, [user?.email, user?.id, updatePresence, goOfflineAndSignOut]);
 
   const handleVisibilityChange = useCallback(() => {
     if (document.visibilityState === 'visible') {
