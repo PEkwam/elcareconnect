@@ -110,14 +110,11 @@ export const useAgentPresence = () => {
       clearTimeout(idleTimerRef.current);
     }
 
-    // Returning after a long background/idle period starts a fresh session,
-    // even when the browser throttled the idle timeout itself.
+    // Returning after a long idle period signs the user out instead of
+    // silently starting a fresh presence session.
     if (wasInactive && currentStatusRef.current !== 'offline' && isAgentRef.current) {
-      autoOfflineRef.current = true;
-      updatePresence('offline').then(() => {
-        autoOfflineRef.current = false;
-        updatePresence('available');
-      });
+      goOfflineAndSignOut();
+      return;
     } else if ((currentStatusRef.current === 'away' || autoOfflineRef.current) && isAgentRef.current) {
       autoOfflineRef.current = false;
       updatePresence('available');
