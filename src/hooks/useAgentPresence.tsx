@@ -98,6 +98,9 @@ export const useAgentPresence = () => {
     }
   }, [user?.email, user?.id]);
 
+  const updatePresenceRef = useRef(updatePresence);
+  updatePresenceRef.current = updatePresence;
+
   const resetIdleTimer = useCallback(() => {
     const wasInactive = Date.now() - lastActivityRef.current >= IDLE_THRESHOLD;
     lastActivityRef.current = Date.now();
