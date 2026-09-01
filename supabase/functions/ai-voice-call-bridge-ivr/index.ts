@@ -118,12 +118,11 @@ serve(async (req) => {
   <Say voice="Polly.Joanna-Neural">No selection received. Connecting you to the agent now.</Say>`
     : `<Redirect method="POST">${langActionUrl}?digit=${defaultDigit}</Redirect>`;
 
+  // No <Pause> between segments: the recording and the spoken name/message must
+  // flow as one continuous sentence, not two separate systems taking turns.
   const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  ${greetingTwiml}
-  ${greetingTwiml ? '<Pause length="1"/>' : ''}
-  ${messageIntroTwiml}
-  ${messageIntroTwiml ? '<Pause length="1"/>' : ''}
+  ${greetingTwiml}${messageIntroTwiml}
   ${tailTwiml}
 </Response>`;
 

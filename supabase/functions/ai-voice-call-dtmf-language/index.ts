@@ -440,13 +440,12 @@ serve(async (req) => {
     const menuTwiml = sayOrPlay(langRow?.menu_audio_url, escapeXml(langRow?.menu_prompt_text || fb.menuPrompt));
     const mainDtmfAction = `${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-voice-call-dtmf`;
 
+    // Segments are emitted back-to-back (no <Pause>) so an uploaded recording
+    // and a system-spoken tag value sound like one continuous message.
     const twimlResponse = isInteractive
       ? `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  ${greetingTwiml}
-  <Pause length="1"/>
-  ${campaignTwiml}
-  <Pause length="1"/>
+  ${greetingTwiml}${campaignTwiml}
   <Gather numDigits="1" action="${mainDtmfAction}" method="POST" timeout="10">
     ${menuTwiml}
   </Gather>
@@ -454,10 +453,7 @@ serve(async (req) => {
 </Response>`
       : `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  ${greetingTwiml}
-  <Pause length="1"/>
-  ${campaignTwiml}
-  <Pause length="1"/>
+  ${greetingTwiml}${campaignTwiml}
   <Say voice="Polly.Joanna-Neural">Thank you. Goodbye!</Say>
 </Response>`;
 
