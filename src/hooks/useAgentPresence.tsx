@@ -16,6 +16,22 @@ export const useAgentPresence = () => {
   const lastActivityRef = useRef<number>(Date.now());
   const currentStatusRef = useRef<string>('offline');
   const autoOfflineRef = useRef(false);
+  const signOutRef = useRef(signOut);
+  signOutRef.current = signOut;
+
+  // After the inactivity threshold the agent is marked offline AND signed out,
+  // so the session cannot be silently kept alive by a background tab.
+  const goOfflineAndSignOut = useCallback(async () => {
+    if (currentStatusRef.current !== 'offline') {
+      autoOfflineRef.current = true;
+      await updatePresence('offline');
+    }
+    try {
+      const { toast } = await import('sonner');
+      toast.info('You were signed out due to inactivity.');
+    } catch { /* non-fatal */ }
+    await signOutRef.current();
+  }, [updatePresence]);
 
   const checkIfAgent = useCallback(async () => {
     if (!user?.id) return false;
