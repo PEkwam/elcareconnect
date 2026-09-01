@@ -24,14 +24,14 @@ export const useAgentPresence = () => {
   const goOfflineAndSignOut = useCallback(async () => {
     if (currentStatusRef.current !== 'offline') {
       autoOfflineRef.current = true;
-      await updatePresence('offline');
+      await updatePresenceRef.current('offline');
     }
     try {
       const { toast } = await import('sonner');
       toast.info('You were signed out due to inactivity.');
     } catch { /* non-fatal */ }
     await signOutRef.current();
-  }, [updatePresence]);
+  }, []);
 
   const checkIfAgent = useCallback(async () => {
     if (!user?.id) return false;
