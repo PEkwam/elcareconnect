@@ -127,12 +127,11 @@ export const useAgentPresence = () => {
     // offline so admins, agents, and supervisors are not shown as available.
     idleTimerRef.current = setTimeout(() => {
       if (isAgentRef.current && currentStatusRef.current !== 'offline') {
-        console.log('Agent idle for 5 minutes - setting to offline');
-        autoOfflineRef.current = true;
-        updatePresence('offline');
+        console.log('Agent idle for 5 minutes - going offline and signing out');
+        goOfflineAndSignOut();
       }
     }, IDLE_THRESHOLD);
-  }, [updatePresence]);
+  }, [updatePresence, goOfflineAndSignOut]);
 
   const sendHeartbeat = useCallback(async () => {
     if (!user?.email || !user?.id || !isAgentRef.current) return;
