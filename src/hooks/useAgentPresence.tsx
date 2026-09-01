@@ -286,7 +286,12 @@ export const checkStaleAgents = async () => {
       // Mark them as offline
       await supabase
         .from('agent_status')
-        .update({ status: 'offline' })
+        .update({
+          status: 'offline',
+          session_started_at: null,
+          current_status_started_at: null,
+          updated_at: new Date().toISOString(),
+        })
         .in('agent_email', staleAgents.map(a => a.agent_email));
     }
   } catch (error) {
