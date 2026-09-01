@@ -61,7 +61,7 @@ serve(async (req) => {
     if (!callData) {
       console.error('Call record not found for CallSid:', callSid, 'or phone:', to);
       return new Response(
-        '<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="alice">We could not find your call record. An agent will contact you. Goodbye!</Say></Response>',
+        '<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Joanna-Neural">We could not find your call record. An agent will contact you. Goodbye!</Say></Response>',
         { headers: { 'Content-Type': 'text/xml', ...corsHeaders } }
       );
     }
@@ -216,7 +216,7 @@ serve(async (req) => {
 
     if (existingAppointment) {
       console.log('Appointment already exists for this call, skipping duplicate creation');
-      const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="alice">Your appointment is already confirmed for ${new Date(existingAppointment.scheduled_date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}. See you then. Goodbye!</Say></Response>`;
+      const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Joanna-Neural">Your appointment is already confirmed for ${new Date(existingAppointment.scheduled_date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}. See you then. Goodbye!</Say></Response>`;
       return new Response(twimlResponse, { headers: { 'Content-Type': 'text/xml', ...corsHeaders } });
     }
 
@@ -238,7 +238,7 @@ serve(async (req) => {
       console.error('Error creating appointment:', appointmentError);
       console.error('Appointment error details:', JSON.stringify(appointmentError));
       return new Response(
-        '<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="alice">We encountered an error scheduling your appointment. Our team will contact you shortly. Goodbye!</Say></Response>',
+        '<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Joanna-Neural">We encountered an error scheduling your appointment. Our team will contact you shortly. Goodbye!</Say></Response>',
         { headers: { 'Content-Type': 'text/xml', ...corsHeaders } }
       );
     }
@@ -326,14 +326,14 @@ serve(async (req) => {
     // Return TwiML response to thank the client
     const timeFormatted = scheduledTime.replace(':', ' ');
     return new Response(
-      `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="alice">Perfect! Your appointment is confirmed for ${scheduledDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })} at ${timeFormatted}. ${email && email.includes('@') ? 'Check your email for details.' : ''} See you then. Goodbye!</Say></Response>`,
+      `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Joanna-Neural">Perfect! Your appointment is confirmed for ${scheduledDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })} at ${timeFormatted}. ${email && email.includes('@') ? 'Check your email for details.' : ''} See you then. Goodbye!</Say></Response>`,
       { headers: { 'Content-Type': 'text/xml', ...corsHeaders } }
     );
 
   } catch (error) {
     console.error('Error finalizing appointment:', error);
     return new Response(
-      '<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="alice">We encountered an error processing your request. Our team will contact you shortly. Goodbye!</Say></Response>',
+      '<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Joanna-Neural">We encountered an error processing your request. Our team will contact you shortly. Goodbye!</Say></Response>',
       {
         status: 500,
         headers: { 'Content-Type': 'text/xml', ...corsHeaders }

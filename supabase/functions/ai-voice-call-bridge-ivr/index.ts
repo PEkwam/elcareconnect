@@ -89,20 +89,20 @@ serve(async (req) => {
   const greetingTwiml = !playGreeting
     ? ''
     : introAudio
-      ? `<Play>${introAudio}</Play>${clientName ? `<Say voice="alice">${escapeXml(clientName)}</Say>` : ''}`
-      : `<Say voice="alice">Dear ${escapeXml(clientName || 'valued customer')}.</Say>`;
+      ? `<Play>${introAudio}</Play>${clientName ? `<Say voice="Polly.Joanna-Neural">${escapeXml(clientName)}</Say>` : ''}`
+      : `<Say voice="Polly.Joanna-Neural">Dear ${escapeXml(clientName || 'valued customer')}.</Say>`;
 
   // Recording 2 — intro message (plays BEFORE the IVR Gather, not inside it).
   const messageIntroTwiml = !playIntro
     ? ''
     : messageIntroAudio
       ? `<Play>${messageIntroAudio}</Play>`
-      : `<Say voice="alice">You have a message from Enterprise Life.</Say>`;
+      : `<Say voice="Polly.Joanna-Neural">You have a message from Enterprise Life.</Say>`;
 
   // Recording 3 — IVR language menu (inside <Gather> so digits are captured).
   const ivrTwiml = ivrAudio
     ? `<Play>${ivrAudio}</Play>`
-    : `<Say voice="alice">For English press 1, Twi press 2, Ga press 3, Hausa press 4, Ewe press 5, press 9 to repeat, press 0 to speak with the agent.</Say>`;
+    : `<Say voice="Polly.Joanna-Neural">For English press 1, Twi press 2, Ga press 3, Hausa press 4, Ewe press 5, press 9 to repeat, press 0 to speak with the agent.</Say>`;
 
   // Build the section after the (optional) greeting/intro:
   //  - IVR ON  → present language menu via <Gather>.
@@ -115,7 +115,7 @@ serve(async (req) => {
     ? `<Gather numDigits="1" action="${langActionUrl}" method="POST" timeout="12">
     ${ivrTwiml}
   </Gather>
-  <Say voice="alice">No selection received. Connecting you to the agent now.</Say>`
+  <Say voice="Polly.Joanna-Neural">No selection received. Connecting you to the agent now.</Say>`
     : `<Redirect method="POST">${langActionUrl}?digit=${defaultDigit}</Redirect>`;
 
   const twiml = `<?xml version="1.0" encoding="UTF-8"?>

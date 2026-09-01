@@ -126,14 +126,14 @@ serve(async (req) => {
     if (!digit && digit !== '9') {
       const p = getPrompts('en');
       return new Response(
-        `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="alice">${p.noResponse}</Say></Response>`,
+        `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Joanna-Neural">${p.noResponse}</Say></Response>`,
         { headers: { 'Content-Type': 'text/xml', ...corsHeaders } }
       );
     }
 
     if (!clientPhone) {
       return new Response(
-        '<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="alice">There was an error processing your request. Goodbye!</Say></Response>',
+        '<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Joanna-Neural">There was an error processing your request. Goodbye!</Say></Response>',
         { headers: { 'Content-Type': 'text/xml', ...corsHeaders } }
       );
     }
@@ -201,7 +201,7 @@ serve(async (req) => {
     if (!callData) {
       console.error('No call record found for client phone:', clientPhone);
       return new Response(
-        `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="alice">${prompts.noRecord}</Say></Response>`,
+        `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Joanna-Neural">${prompts.noRecord}</Say></Response>`,
         { headers: { 'Content-Type': 'text/xml', ...corsHeaders } }
       );
     }
@@ -280,16 +280,16 @@ serve(async (req) => {
       const twimlResponse = dialNumber
         ? `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="alice">${prompts.transferToAgent}</Say>
+  <Say voice="Polly.Joanna-Neural">${prompts.transferToAgent}</Say>
   <Pause length="1"/>
   <Dial timeout="30"${callerIdAttr} answerOnBridge="true">
     <Number>${escapeXml(dialNumber)}</Number>
   </Dial>
-  <Say voice="alice">We were unable to reach an agent. We will call you back shortly. Goodbye!</Say>
+  <Say voice="Polly.Joanna-Neural">We were unable to reach an agent. We will call you back shortly. Goodbye!</Say>
 </Response>`
         : `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="alice">No agents are configured to receive transfers. We will call you back shortly. Goodbye!</Say>
+  <Say voice="Polly.Joanna-Neural">No agents are configured to receive transfers. We will call you back shortly. Goodbye!</Say>
 </Response>`;
 
       return new Response(twimlResponse, {
@@ -302,12 +302,12 @@ serve(async (req) => {
       console.log('Client pressed 9 - repeating menu options');
       const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="alice">${prompts.repeatInfo}</Say>
+  <Say voice="Polly.Joanna-Neural">${prompts.repeatInfo}</Say>
   <Pause length="1"/>
   <Gather numDigits="1" timeout="10" action="${mainDtmfAction}" method="POST">
-    <Say voice="alice">${prompts.menuPrompt}</Say>
+    <Say voice="Polly.Joanna-Neural">${prompts.menuPrompt}</Say>
   </Gather>
-  <Say voice="alice">${prompts.noResponse}</Say>
+  <Say voice="Polly.Joanna-Neural">${prompts.noResponse}</Say>
 </Response>`;
       return new Response(twimlResponse, {
         headers: { 'Content-Type': 'text/xml', ...corsHeaders }
@@ -319,11 +319,11 @@ serve(async (req) => {
       console.log('Client pressed 1 - collecting appointment details');
       const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="alice">${prompts.scheduleGreat}</Say>
+  <Say voice="Polly.Joanna-Neural">${prompts.scheduleGreat}</Say>
   <Pause length="1"/>
-  <Say voice="alice">${prompts.sayPreferredDate}</Say>
+  <Say voice="Polly.Joanna-Neural">${prompts.sayPreferredDate}</Say>
   <Record maxLength="30" timeout="5" action="${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-voice-call-dtmf-appointment-finalize" method="POST" transcribe="true" transcribeCallback="${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-voice-call-dtmf-appointment-finalize"/>
-  <Say voice="alice">${prompts.noResponse}</Say>
+  <Say voice="Polly.Joanna-Neural">${prompts.noResponse}</Say>
 </Response>`;
 
       const existingNotes = callData.notes || '';
@@ -366,7 +366,7 @@ serve(async (req) => {
         .eq('id', callData.id);
 
       return new Response(
-        `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="alice">${prompts.callbackOk}</Say></Response>`,
+        `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Joanna-Neural">${prompts.callbackOk}</Say></Response>`,
         { headers: { 'Content-Type': 'text/xml', ...corsHeaders } }
       );
 
@@ -386,7 +386,7 @@ serve(async (req) => {
           .eq('id', callData.id);
 
         return new Response(
-          `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="alice">${prompts.maxRetries}</Say></Response>`,
+          `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Joanna-Neural">${prompts.maxRetries}</Say></Response>`,
           { headers: { 'Content-Type': 'text/xml', ...corsHeaders } }
         );
       }
@@ -400,12 +400,12 @@ serve(async (req) => {
 
       const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="alice">${prompts.invalidInput}</Say>
+  <Say voice="Polly.Joanna-Neural">${prompts.invalidInput}</Say>
   <Pause length="1"/>
   <Gather numDigits="1" timeout="10" action="${mainDtmfAction}" method="POST">
-    <Say voice="alice">${prompts.menuPrompt}</Say>
+    <Say voice="Polly.Joanna-Neural">${prompts.menuPrompt}</Say>
   </Gather>
-  <Say voice="alice">${prompts.noResponse}</Say>
+  <Say voice="Polly.Joanna-Neural">${prompts.noResponse}</Say>
 </Response>`;
 
       return new Response(twimlResponse, {
