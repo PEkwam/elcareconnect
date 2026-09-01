@@ -139,10 +139,7 @@ export const useAgentPresence = () => {
     // A background tab can throttle the idle timeout while intervals continue.
     // Never let heartbeats keep an inactive session alive indefinitely.
     if (Date.now() - lastActivityRef.current >= IDLE_THRESHOLD) {
-      if (currentStatusRef.current !== 'offline') {
-        autoOfflineRef.current = true;
-        await updatePresence('offline');
-      }
+      await goOfflineAndSignOut();
       return;
     }
 
