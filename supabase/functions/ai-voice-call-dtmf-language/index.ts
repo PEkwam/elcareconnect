@@ -204,7 +204,7 @@ serve(async (req) => {
       return new Response(
         `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  ${message ? `<Say voice="Polly.Joanna-Neural">${message}</Say><Pause length="1"/>` : ''}
+  ${message ? `<Say voice="Polly.Joanna-Neural">${message}</Say>` : ''}
   <Gather numDigits="1" action="${langActionUrl}" method="POST" timeout="15">
     ${ivrTwiml}
   </Gather>
