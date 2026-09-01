@@ -54,7 +54,7 @@ async function makePhoneCall(toNumber: string, _message: string, _campaign: any,
     toLeg = settings.admin_bridge_phone;
     twimlContent = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="alice">Connecting you to the client. Please wait while they choose a language.</Say>
+  <Say voice="Polly.Joanna-Neural">Connecting you to the client. Please wait while they choose a language.</Say>
   <Dial callerId="${callerId}" answerOnBridge="true" timeout="30">
     <Number url="${bridgeIvrUrl}" method="POST">${toNumber}</Number>
   </Dial>

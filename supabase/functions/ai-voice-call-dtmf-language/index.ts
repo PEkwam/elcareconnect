@@ -20,7 +20,7 @@ const FALLBACK: Record<string, { code: string; greeting: string; menuPrompt: str
 function sayOrPlay(audioUrl: string | null | undefined, text: string): string {
   if (audioUrl) return `<Play>${audioUrl}</Play>`;
   if (!text) return '';
-  return `<Say voice="alice">${text}</Say>`;
+  return `<Say voice="Polly.Joanna-Neural">${text}</Say>`;
 }
 
 function escapeXml(s: string): string {
@@ -58,18 +58,18 @@ function liveAgentTwiml(dialNumber: string | null): string {
   if (!dialNumber) {
     return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="alice">No live agent number is configured. We will call you back shortly. Goodbye!</Say>
+  <Say voice="Polly.Joanna-Neural">No live agent number is configured. We will call you back shortly. Goodbye!</Say>
 </Response>`;
   }
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="alice">Please hold while we connect you to a live agent.</Say>
+  <Say voice="Polly.Joanna-Neural">Please hold while we connect you to a live agent.</Say>
   <Pause length="1"/>
   <Dial timeout="30"${callerIdAttr} answerOnBridge="true">
     <Number>${escapeXml(dialNumber)}</Number>
   </Dial>
-  <Say voice="alice">We were unable to reach an agent. We will call you back shortly. Goodbye!</Say>
+  <Say voice="Polly.Joanna-Neural">We were unable to reach an agent. We will call you back shortly. Goodbye!</Say>
 </Response>`;
 }
 
@@ -199,12 +199,12 @@ serve(async (req) => {
 
       const ivrTwiml = ivrRow?.audio_url
         ? `<Play>${ivrRow.audio_url}</Play>`
-        : `<Say voice="alice">For English press 1, Twi press 2, Ga press 3, Hausa press 4, Ewe press 5, press 9 to repeat, press 0 for a live agent.</Say>`;
+        : `<Say voice="Polly.Joanna-Neural">For English press 1, Twi press 2, Ga press 3, Hausa press 4, Ewe press 5, press 9 to repeat, press 0 for a live agent.</Say>`;
 
       return new Response(
         `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  ${message ? `<Say voice="alice">${message}</Say><Pause length="1"/>` : ''}
+  ${message ? `<Say voice="Polly.Joanna-Neural">${message}</Say>` : ''}
   <Gather numDigits="1" action="${langActionUrl}" method="POST" timeout="15">
     ${ivrTwiml}
   </Gather>
@@ -391,13 +391,13 @@ serve(async (req) => {
               out.push(`<Play>${dbSeg.audio_url}</Play>`);
             } else {
               const val = resolveTag(p.tag_name!);
-              if (val) out.push(`<Say voice="alice">${escapeXml(val)}</Say>`);
+              if (val) out.push(`<Say voice="Polly.Joanna-Neural">${escapeXml(val)}</Say>`);
             }
           } else {
             if (dbSeg?.audio_url) {
               out.push(`<Play>${dbSeg.audio_url}</Play>`);
             } else {
-              out.push(`<Say voice="alice">${escapeXml(applyPlaceholders(p.text, client, productNameByCode))}</Say>`);
+              out.push(`<Say voice="Polly.Joanna-Neural">${escapeXml(applyPlaceholders(p.text, client, productNameByCode))}</Say>`);
             }
           }
         });
@@ -410,10 +410,10 @@ serve(async (req) => {
           .map((s) => {
             if (s.is_tag) {
               const val = resolveTag(s.tag_name);
-              return val ? `<Say voice="alice">${escapeXml(val)}</Say>` : '';
+              return val ? `<Say voice="Polly.Joanna-Neural">${escapeXml(val)}</Say>` : '';
             }
             if (s.audio_url) return `<Play>${s.audio_url}</Play>`;
-            if (s.text_content) return `<Say voice="alice">${escapeXml(applyPlaceholders(s.text_content, client, productNameByCode))}</Say>`;
+            if (s.text_content) return `<Say voice="Polly.Joanna-Neural">${escapeXml(applyPlaceholders(s.text_content, client, productNameByCode))}</Say>`;
             return '';
           }).join('\n  ');
       } else {
@@ -424,13 +424,13 @@ serve(async (req) => {
           campaignTwiml = `<Play>${localizedAudio}</Play>`;
         } else {
           const text = applyPlaceholders(scriptSource, client, productNameByCode);
-          if (text) campaignTwiml = `<Say voice="alice">${escapeXml(text)}</Say>`;
+          if (text) campaignTwiml = `<Say voice="Polly.Joanna-Neural">${escapeXml(text)}</Say>`;
         }
       }
 
       if (!campaignTwiml) {
         console.warn('No campaign script available for language', fb.code, 'campaign', campaign.id);
-        campaignTwiml = `<Say voice="alice">Sorry, the message in your selected language is not yet available.</Say>`;
+        campaignTwiml = `<Say voice="Polly.Joanna-Neural">Sorry, the message in your selected language is not yet available.</Say>`;
       }
     }
 
@@ -440,25 +440,21 @@ serve(async (req) => {
     const menuTwiml = sayOrPlay(langRow?.menu_audio_url, escapeXml(langRow?.menu_prompt_text || fb.menuPrompt));
     const mainDtmfAction = `${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-voice-call-dtmf`;
 
+    // Segments are emitted back-to-back (no <Pause>) so an uploaded recording
+    // and a system-spoken tag value sound like one continuous message.
     const twimlResponse = isInteractive
       ? `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  ${greetingTwiml}
-  <Pause length="1"/>
-  ${campaignTwiml}
-  <Pause length="1"/>
+  ${greetingTwiml}${campaignTwiml}
   <Gather numDigits="1" action="${mainDtmfAction}" method="POST" timeout="10">
     ${menuTwiml}
   </Gather>
-  <Say voice="alice">We didn't receive your response. We'll call you back. Goodbye!</Say>
+  <Say voice="Polly.Joanna-Neural">We didn't receive your response. We'll call you back. Goodbye!</Say>
 </Response>`
       : `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  ${greetingTwiml}
-  <Pause length="1"/>
-  ${campaignTwiml}
-  <Pause length="1"/>
-  <Say voice="alice">Thank you. Goodbye!</Say>
+  ${greetingTwiml}${campaignTwiml}
+  <Say voice="Polly.Joanna-Neural">Thank you. Goodbye!</Say>
 </Response>`;
 
     return new Response(twimlResponse, {

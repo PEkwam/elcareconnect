@@ -34,7 +34,7 @@ serve(async (req) => {
     if (!to) {
       console.error('No phone number received from Twilio');
       return new Response(
-        '<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="alice">There was an error. We will call you back. Goodbye!</Say></Response>',
+        '<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Joanna-Neural">There was an error. We will call you back. Goodbye!</Say></Response>',
         { headers: { 'Content-Type': 'text/xml', ...corsHeaders } }
       );
     }
@@ -69,7 +69,7 @@ serve(async (req) => {
     if (!callData) {
       console.error('Call record not found for phone:', to, 'or CallSid:', callSid);
       return new Response(
-        '<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="alice">We could not find your call record. An agent will contact you. Goodbye!</Say></Response>',
+        '<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Joanna-Neural">We could not find your call record. An agent will contact you. Goodbye!</Say></Response>',
         { headers: { 'Content-Type': 'text/xml', ...corsHeaders } }
       );
     }
@@ -102,7 +102,7 @@ serve(async (req) => {
           .eq('id', callData.id);
 
         return new Response(
-          '<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="alice">We could not capture your response. An agent will contact you. Goodbye!</Say></Response>',
+          '<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Joanna-Neural">We could not capture your response. An agent will contact you. Goodbye!</Say></Response>',
           { headers: { 'Content-Type': 'text/xml', ...corsHeaders } }
         );
       }
@@ -121,12 +121,12 @@ serve(async (req) => {
 
       const retryResponse = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="alice">Sorry, I did not catch that. Let's try again.</Say>
+  <Say voice="Polly.Joanna-Neural">Sorry, I did not catch that. Let's try again.</Say>
   <Pause length="1"/>
-  <Say voice="alice">Please speak your preferred date and time clearly. For example, Monday at 10 A M.</Say>
+  <Say voice="Polly.Joanna-Neural">Please speak your preferred date and time clearly. For example, Monday at 10 A M.</Say>
   <Pause length="1"/>
   <Record maxLength="20" timeout="3" transcribe="true" transcribeCallback="https://prtvithyqpepdyaglzpg.supabase.co/functions/v1/ai-voice-call-dtmf-appointment"/>
-  <Say voice="alice">We did not receive your response. An agent will contact you shortly. Goodbye!</Say>
+  <Say voice="Polly.Joanna-Neural">We did not receive your response. An agent will contact you shortly. Goodbye!</Say>
 </Response>`;
 
       return new Response(retryResponse, {
@@ -147,7 +147,7 @@ serve(async (req) => {
     if (updateResult.error) {
       console.error('Error storing appointment preference:', updateResult.error);
       return new Response(
-        '<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="alice">We encountered an error saving your preference. An agent will contact you. Goodbye!</Say></Response>',
+        '<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Joanna-Neural">We encountered an error saving your preference. An agent will contact you. Goodbye!</Say></Response>',
         { headers: { 'Content-Type': 'text/xml', ...corsHeaders } }
       );
     }
@@ -157,7 +157,7 @@ serve(async (req) => {
     // Acknowledge and redirect to finalize (Twilio Redirect makes POST request)
     const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="alice">Got it! Checking availability now.</Say>
+  <Say voice="Polly.Joanna-Neural">Got it! Checking availability now.</Say>
   <Redirect method="POST">https://prtvithyqpepdyaglzpg.supabase.co/functions/v1/ai-voice-call-dtmf-appointment-finalize</Redirect>
 </Response>`;
 
