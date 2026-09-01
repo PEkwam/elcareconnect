@@ -148,7 +148,7 @@ export const useAgentPresence = () => {
     } catch (error) {
       console.error('Error sending heartbeat:', error);
     }
-  }, [user?.email, user?.id, updatePresence]);
+  }, [user?.email, user?.id, updatePresence, goOfflineAndSignOut]);
 
   const handleVisibilityChange = useCallback(() => {
     if (document.visibilityState === 'visible') {
