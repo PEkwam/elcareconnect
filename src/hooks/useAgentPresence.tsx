@@ -15,6 +15,7 @@ export const useAgentPresence = () => {
   const isAgentRef = useRef(false);
   const lastActivityRef = useRef<number>(Date.now());
   const currentStatusRef = useRef<string>('offline');
+  const autoOfflineRef = useRef(false);
 
   const checkIfAgent = useCallback(async () => {
     if (!user?.id) return false;
@@ -90,7 +91,8 @@ export const useAgentPresence = () => {
     }
 
     // If currently away, set back to available
-    if (currentStatusRef.current === 'away' && isAgentRef.current) {
+    if ((currentStatusRef.current === 'away' || autoOfflineRef.current) && isAgentRef.current) {
+      autoOfflineRef.current = false;
       updatePresence('available');
     }
 
@@ -99,13 +101,24 @@ export const useAgentPresence = () => {
     idleTimerRef.current = setTimeout(() => {
       if (isAgentRef.current && currentStatusRef.current !== 'offline') {
         console.log('Agent idle for 5 minutes - setting to offline');
+        autoOfflineRef.current = true;
         updatePresence('offline');
       }
     }, IDLE_THRESHOLD);
   }, [updatePresence]);
 
   const sendHeartbeat = useCallback(async () => {
-    if (!user?.email || !isAgentRef.current) return;
+    if (!user?.email || !user?.id || !isAgentRef.current) return;
+
+    // A background tab can throttle the idle timeout while intervals continue.
+    // Never let heartbeats keep an inactive session alive indefinitely.
+    if (Date.now() - lastActivityRef.current >= IDLE_THRESHOLD) {
+      if (currentStatusRef.current !== 'offline') {
+        autoOfflineRef.current = true;
+        await updatePresence('offline');
+      }
+      return;
+    }
 
     try {
       await supabase
@@ -115,7 +128,7 @@ export const useAgentPresence = () => {
     } catch (error) {
       console.error('Error sending heartbeat:', error);
     }
-  }, [user?.email]);
+  }, [user?.email, user?.id, updatePresence]);
 
   const handleVisibilityChange = useCallback(() => {
     if (document.visibilityState === 'visible') {
@@ -190,6 +203,8 @@ export const useAgentPresence = () => {
     const onUnload = () => fnRefs.current.handleBeforeUnload();
 
     const initPresence = async () => {
+      const userId = user?.id;
+      if (!userId) return;
       const isAgent = await fnRefs.current.checkIfAgent();
       if (cancelled) return;
       isAgentRef.current = isAgent;
@@ -200,7 +215,7 @@ export const useAgentPresence = () => {
         const { data: existing } = await supabase
           .from('agent_status')
           .select('status, updated_at')
-          .eq('user_id', user!.id)
+          .eq('user_id', userId)
           .maybeSingle();
 
         if (cancelled) return;
@@ -211,6 +226,7 @@ export const useAgentPresence = () => {
           : true;
 
         if (!existing || existing.status === 'offline' || stale) {
+          autoOfflineRef.current = false;
           await fnRefs.current.updatePresence('available');
           currentStatusRef.current = 'available';
         } else {
