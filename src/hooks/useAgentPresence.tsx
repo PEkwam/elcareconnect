@@ -312,6 +312,13 @@ export const useAgentPresence = () => {
       if (isAgentRef.current) {
         fnRefs.current.updatePresence('offline');
       }
+
+      // Clear per-session state so the next sign-in starts clean instead of
+      // inheriting the previous session's idle timestamp/status.
+      isAgentRef.current = false;
+      currentStatusRef.current = 'offline';
+      autoOfflineRef.current = false;
+      lastActivityRef.current = Date.now();
     };
   }, [user?.id]);
 
