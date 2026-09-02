@@ -18,20 +18,39 @@ export const useAgentPresence = () => {
   const autoOfflineRef = useRef(false);
   const signOutRef = useRef(signOut);
   signOutRef.current = signOut;
+  const signingOutRef = useRef(false);
 
   // After the inactivity threshold the agent is marked offline AND signed out,
   // so the session cannot be silently kept alive by a background tab.
   const goOfflineAndSignOut = useCallback(async () => {
+    // Idle timer, heartbeat and the return-from-idle path can all trigger this
+    // at once; without a guard the duplicate sign-outs leave the client in a
+    // half-signed-out state that needs two logins to recover.
+    if (signingOutRef.current) return;
+    signingOutRef.current = true;
+
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    if (heartbeatRef.current) clearInterval(heartbeatRef.current);
+
     if (currentStatusRef.current !== 'offline') {
       autoOfflineRef.current = true;
       await updatePresenceRef.current('offline');
     }
+    // Only stop tracking after the offline write (updatePresence needs the flag).
+    isAgentRef.current = false;
+    currentStatusRef.current = 'offline';
     try {
       const { toast } = await import('sonner');
       toast.info('You were signed out due to inactivity.');
     } catch { /* non-fatal */ }
-    await signOutRef.current();
+    try {
+      await signOutRef.current();
+    } finally {
+      signingOutRef.current = false;
+      lastActivityRef.current = Date.now();
+    }
   }, []);
+
 
   const checkIfAgent = useCallback(async () => {
     if (!user?.id) return false;
@@ -225,9 +244,19 @@ export const useAgentPresence = () => {
     const initPresence = async () => {
       const userId = user?.id;
       if (!userId) return;
+
+      // A fresh sign-in starts a fresh activity window. Without this, the stale
+      // lastActivity timestamp left behind by the previous (idle) session makes
+      // the very first resetIdleTimer/heartbeat treat the new login as inactive
+      // and sign the user straight back out — forcing a second sign-in.
+      lastActivityRef.current = Date.now();
+      autoOfflineRef.current = false;
+      currentStatusRef.current = 'offline';
+
       const isAgent = await fnRefs.current.checkIfAgent();
       if (cancelled) return;
       isAgentRef.current = isAgent;
+
 
       if (isAgent) {
         // Only auto-set to available on login if user is currently offline (or has no row).
@@ -283,6 +312,13 @@ export const useAgentPresence = () => {
       if (isAgentRef.current) {
         fnRefs.current.updatePresence('offline');
       }
+
+      // Clear per-session state so the next sign-in starts clean instead of
+      // inheriting the previous session's idle timestamp/status.
+      isAgentRef.current = false;
+      currentStatusRef.current = 'offline';
+      autoOfflineRef.current = false;
+      lastActivityRef.current = Date.now();
     };
   }, [user?.id]);
 
