@@ -225,9 +225,19 @@ export const useAgentPresence = () => {
     const initPresence = async () => {
       const userId = user?.id;
       if (!userId) return;
+
+      // A fresh sign-in starts a fresh activity window. Without this, the stale
+      // lastActivity timestamp left behind by the previous (idle) session makes
+      // the very first resetIdleTimer/heartbeat treat the new login as inactive
+      // and sign the user straight back out — forcing a second sign-in.
+      lastActivityRef.current = Date.now();
+      autoOfflineRef.current = false;
+      currentStatusRef.current = 'offline';
+
       const isAgent = await fnRefs.current.checkIfAgent();
       if (cancelled) return;
       isAgentRef.current = isAgent;
+
 
       if (isAgent) {
         // Only auto-set to available on login if user is currently offline (or has no row).
