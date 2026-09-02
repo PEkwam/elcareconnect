@@ -48,8 +48,8 @@ const Dashboard = () => {
   // Initialize session timeout
   useSessionTimeout();
 
-  // Initialize agent presence tracking - runs for all agents/admins at dashboard level
-  useAgentPresence();
+  // Presence tracking is owned globally by <PresenceTracker /> in App.tsx.
+
 
   // Initialize onboarding tour
   const { hasCompletedOnboarding, startTour } = useOnboardingTour();
