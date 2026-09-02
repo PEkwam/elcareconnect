@@ -18,20 +18,38 @@ export const useAgentPresence = () => {
   const autoOfflineRef = useRef(false);
   const signOutRef = useRef(signOut);
   signOutRef.current = signOut;
+  const signingOutRef = useRef(false);
 
   // After the inactivity threshold the agent is marked offline AND signed out,
   // so the session cannot be silently kept alive by a background tab.
   const goOfflineAndSignOut = useCallback(async () => {
+    // Idle timer, heartbeat and the return-from-idle path can all trigger this
+    // at once; without a guard the duplicate sign-outs leave the client in a
+    // half-signed-out state that needs two logins to recover.
+    if (signingOutRef.current) return;
+    signingOutRef.current = true;
+
+    isAgentRef.current = false;
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    if (heartbeatRef.current) clearInterval(heartbeatRef.current);
+
     if (currentStatusRef.current !== 'offline') {
       autoOfflineRef.current = true;
       await updatePresenceRef.current('offline');
     }
+    currentStatusRef.current = 'offline';
     try {
       const { toast } = await import('sonner');
       toast.info('You were signed out due to inactivity.');
     } catch { /* non-fatal */ }
-    await signOutRef.current();
+    try {
+      await signOutRef.current();
+    } finally {
+      signingOutRef.current = false;
+      lastActivityRef.current = Date.now();
+    }
   }, []);
+
 
   const checkIfAgent = useCallback(async () => {
     if (!user?.id) return false;
