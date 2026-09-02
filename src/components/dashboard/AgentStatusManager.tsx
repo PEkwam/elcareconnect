@@ -23,7 +23,8 @@ interface AgentStatus {
   total_time_on_break_seconds: number;
 }
 
-const STALE_THRESHOLD_MS = 60000; // 60 seconds - if no heartbeat, consider offline
+// Must match OFFLINE_THRESHOLD in useAgentPresence (heartbeat is every 20s).
+const STALE_THRESHOLD_MS = 90000;
 
 // Helper function to format seconds to readable duration
 const formatDuration = (seconds: number): string => {
