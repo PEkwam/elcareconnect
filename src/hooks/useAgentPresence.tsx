@@ -29,7 +29,6 @@ export const useAgentPresence = () => {
     if (signingOutRef.current) return;
     signingOutRef.current = true;
 
-    isAgentRef.current = false;
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     if (heartbeatRef.current) clearInterval(heartbeatRef.current);
 
@@ -37,6 +36,8 @@ export const useAgentPresence = () => {
       autoOfflineRef.current = true;
       await updatePresenceRef.current('offline');
     }
+    // Only stop tracking after the offline write (updatePresence needs the flag).
+    isAgentRef.current = false;
     currentStatusRef.current = 'offline';
     try {
       const { toast } = await import('sonner');
