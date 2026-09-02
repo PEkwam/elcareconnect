@@ -12,7 +12,6 @@ import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useSessionTimeout } from "@/hooks/useSessionTimeout";
 import { useOnboardingTour } from "@/hooks/useOnboardingTour";
-import { useAgentPresence } from "@/hooks/useAgentPresence";
 import { fireSuccessConfetti } from "@/utils/confetti";
 import ClientsTab from "@/components/dashboard/ClientsTab";
 import CallsTab from "@/components/dashboard/CallsTab";
