@@ -12,7 +12,6 @@ import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useSessionTimeout } from "@/hooks/useSessionTimeout";
 import { useOnboardingTour } from "@/hooks/useOnboardingTour";
-import { useAgentPresence } from "@/hooks/useAgentPresence";
 import { fireSuccessConfetti } from "@/utils/confetti";
 import ClientsTab from "@/components/dashboard/ClientsTab";
 import CallsTab from "@/components/dashboard/CallsTab";
@@ -48,8 +47,8 @@ const Dashboard = () => {
   // Initialize session timeout
   useSessionTimeout();
 
-  // Initialize agent presence tracking - runs for all agents/admins at dashboard level
-  useAgentPresence();
+  // Presence tracking is owned globally by <PresenceTracker /> in App.tsx.
+
 
   // Initialize onboarding tour
   const { hasCompletedOnboarding, startTour } = useOnboardingTour();

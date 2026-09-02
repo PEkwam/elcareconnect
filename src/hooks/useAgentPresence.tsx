@@ -308,18 +308,14 @@ export const useAgentPresence = () => {
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('beforeunload', onUnload);
 
-      // Set offline when the user actually leaves (logout / unmount).
-      if (isAgentRef.current) {
-        fnRefs.current.updatePresence('offline');
-      }
-
-      // Clear per-session state so the next sign-in starts clean instead of
-      // inheriting the previous session's idle timestamp/status.
+      // NOTE: do NOT write "offline" here. This cleanup also fires on React
+      // StrictMode double-mounts and on any remount of the tracker, which was
+      // flipping an actively signed-in user to Offline. Real sign-out is
+      // handled by the auth listener below; tab close by beforeunload; and
+      // crashed sessions by the stale-heartbeat sweeper.
       isAgentRef.current = false;
-      currentStatusRef.current = 'offline';
-      autoOfflineRef.current = false;
-      lastActivityRef.current = Date.now();
     };
+
   }, [user?.id]);
 
 
