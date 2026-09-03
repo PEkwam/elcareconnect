@@ -132,12 +132,6 @@ serve(async (req) => {
 
     console.log('Language DTMF received:', { digit, callSid, to, attempt, queryDigit });
 
-    // After 2 silent/invalid attempts, auto-select English (default = 1)
-    const isInvalid = !digit || (digit !== '0' && digit !== '9' && !FALLBACK[digit]);
-    if (isInvalid && attempt >= 2) {
-      console.log('Max IVR attempts reached — defaulting to English (1)');
-      digit = '1';
-    }
 
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
