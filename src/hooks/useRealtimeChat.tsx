@@ -133,9 +133,6 @@ export const useRealtimeChat = ({ onConnectionChange, onSpeakingChange }: UseRea
               // Handle function calls here if needed
               break;
 
-            case 'error':
-              console.error('WebSocket error:', data.message);
-              break;
 
             default:
               console.log('Unhandled message type:', data.type);
