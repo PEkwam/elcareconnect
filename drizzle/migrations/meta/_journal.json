@@ -22,6 +22,13 @@
       "when": 1788428647452,
       "tag": "0002_move_role_helpers_to_private_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1788428675117,
+      "tag": "0003_repoint_unqualified_role_helper_policies",
+      "breakpoints": true
     }
   ]
 }
