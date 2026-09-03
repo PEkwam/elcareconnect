@@ -1157,7 +1157,7 @@ const ClientsTab = ({ onStatsUpdate }: ClientsTabProps) => {
             </Select>
           </div>
           <span className="text-xs text-muted-foreground">
-            {(() => {
+            {isSearching ? "Searching…" : (() => {
               const visible = clients.filter((c) => {
                 if (campaignFilter === "all") return true;
                 const list = assignments[c.id] || [];
