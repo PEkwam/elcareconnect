@@ -56,7 +56,18 @@ serve(async (req) => {
       });
     }
 
-    return new Response(JSON.stringify({ success: true, queued: true }), {
+    // Apply immediately instead of waiting for the cron drain, so the UI
+    // reflects completed / no-answer / busy / failed within the same request.
+    let applied = false;
+    try {
+      const { error: drainErr } = await supabaseAdmin.rpc('process_outbound_call_events', { _limit: 200 });
+      applied = !drainErr;
+      if (drainErr) console.error('Inline drain failed (cron will retry):', drainErr);
+    } catch (e) {
+      console.error('Inline drain threw (cron will retry):', e);
+    }
+
+    return new Response(JSON.stringify({ success: true, queued: true, applied }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
