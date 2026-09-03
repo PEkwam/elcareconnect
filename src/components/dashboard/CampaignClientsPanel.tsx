@@ -111,34 +111,19 @@ export const CampaignClientsPanel = ({ campaignId, script }: Props) => {
 
   const upsertRow = async (record: Record<string, string>) => {
     const prepared = prepareClientRow(record, 0);
-    const { name, phone, policy_number: policy } = prepared;
-    const email = prepared.email;
-    const productType = prepared.product_type;
-    const premium = prepared.premium_amount;
-    const dueDate = prepared.premium_due_date;
-    const paymentStatus = prepared.payment_status;
-
-    const clientPayload: Record<string, any> = { name, phone };
-    if (!name || !rawPhone) throw new Error("client_name and phone are required");
+    const { name, phone: rawPhone, policy_number: policy } = prepared;
     const phone = toValidE164(rawPhone);
     if (!phone) {
       throw new Error(`Invalid phone number "${rawPhone}". Use a valid local (0246052499) or international (+233246052499) number.`);
     }
 
-    const email = clean(record.email) || null;
-    // Accept either product_type or policy_type as the product/policy descriptor
-    const productType = clean(record.product_type || record.policy_type) || null;
-    const premium = parsePremium(clean(record.premium_amount ?? record.premium ?? record.cur_premium ?? record.current_premium));
-    const dueDate = normalizeDate(clean(record.premium_due_date || record.due_date));
-    const paymentStatus = clean(record.payment_status) || null;
-
     const clientPayload: Record<string, any> = { name, phone };
     if (policy) clientPayload.policy_number = policy;
-    if (email) clientPayload.email = email;
-    if (productType) clientPayload.product_type = productType;
-    if (premium !== null) clientPayload.premium_amount = premium;
-    if (dueDate) clientPayload.premium_due_date = dueDate;
-    if (paymentStatus) clientPayload.payment_status = paymentStatus;
+    if (prepared.email) clientPayload.email = prepared.email;
+    if (prepared.product_type) clientPayload.product_type = prepared.product_type;
+    if (prepared.premium_amount !== null) clientPayload.premium_amount = prepared.premium_amount;
+    if (prepared.premium_due_date) clientPayload.premium_due_date = prepared.premium_due_date;
+    if (prepared.payment_status) clientPayload.payment_status = prepared.payment_status;
 
     // Find client by policy_number or phone, else create
     let clientId: string | null = null;
@@ -164,17 +149,10 @@ export const CampaignClientsPanel = ({ campaignId, script }: Props) => {
       await supabase.from("clients").update(clientPayload).eq("id", clientId);
     }
 
-    // Custom tag data — exclude anything synced into the clients table
-    const custom: Record<string, string> = {};
-    for (const k of Object.keys(record)) {
-      if (STANDARD_CLIENT_FIELDS.includes(k)) continue;
-      if (record[k] != null && String(record[k]).trim() !== "") custom[k] = String(record[k]).trim();
-    }
-
     const { error: linkErr } = await (supabase as any)
       .from("campaign_clients")
       .upsert(
-        { campaign_id: campaignId, client_id: clientId, custom_data: custom },
+        { campaign_id: campaignId, client_id: clientId, custom_data: prepared.custom_data },
         { onConflict: "campaign_id,client_id" }
       );
     if (linkErr) throw linkErr;
@@ -182,31 +160,12 @@ export const CampaignClientsPanel = ({ campaignId, script }: Props) => {
 
   // Build the normalized payload the import function expects, without touching the DB.
   const prepareRow = (record: Record<string, string>, rowNumber: number) => {
-    const name = clean(record.client_name || record.name || record.full_name || record.customer_name);
-    const rawPhone = normalizePhone(clean(record.phone));
-    if (!name || !rawPhone) throw new Error("client_name and phone are required");
-    const phone = toValidE164(rawPhone);
+    const prepared = prepareClientRow(record, rowNumber);
+    const phone = toValidE164(prepared.phone);
     if (!phone) {
-      throw new Error(`Invalid phone number "${rawPhone}". Use a valid local (0246052499) or international (+233246052499) number.`);
+      throw new Error(`Invalid phone number "${prepared.phone}". Use a valid local (0246052499) or international (+233246052499) number.`);
     }
-    const paymentStatus = clean(record.payment_status).toLowerCase();
-    const custom: Record<string, string> = {};
-    for (const k of Object.keys(record)) {
-      if (STANDARD_CLIENT_FIELDS.includes(k)) continue;
-      if (record[k] != null && String(record[k]).trim() !== "") custom[k] = String(record[k]).trim();
-    }
-    return {
-      row_number: rowNumber,
-      name,
-      phone,
-      policy_number: clean(record.policy_number) || null,
-      email: clean(record.email) || null,
-      product_type: clean(record.product_type || record.policy_type) || null,
-      premium_amount: parsePremium(clean(record.premium_amount ?? record.premium ?? record.cur_premium ?? record.current_premium)),
-      premium_due_date: normalizeDate(clean(record.premium_due_date || record.due_date)),
-      payment_status: ["current", "overdue", "failed"].includes(paymentStatus) ? paymentStatus : null,
-      custom_data: custom,
-    };
+    return { ...prepared, phone };
   };
 
   const handleFile = async (file: File) => {
