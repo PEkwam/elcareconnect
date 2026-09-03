@@ -43,7 +43,7 @@ export const useRealtimeChat = ({ onConnectionChange, onSpeakingChange }: UseRea
       console.log('Connecting to realtime chat...');
       
       // Use the full URL to the edge function
-      const wsUrl = `wss://prtvithyqpepdyaglzpg.functions.supabase.co/functions/v1/realtime-chat`;
+      const wsUrl = `${import.meta.env.VITE_SUPABASE_URL.replace(/^https/, 'wss')}/functions/v1/realtime-chat`;
       console.log('Connecting to:', wsUrl);
       
       wsRef.current = new WebSocket(wsUrl);

@@ -2,6 +2,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { verifyTwilioRequest } from "../_shared/twilio-verify.ts";
+import { findCallForLeg } from "../_shared/call-lookup.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -45,26 +46,9 @@ serve(async (req) => {
       { auth: { persistSession: false } }
     );
 
-    // Find the call record by phone number
-    const { data: callRecords, error: fetchError } = await supabaseAdmin
-      .from('outbound_calls')
-      .select('*, clients(*)')
-      .eq('phone_number', to)
-      .order('created_at', { ascending: false })
-      .limit(5);
-    
-    if (fetchError) {
-      console.error('Error fetching call records:', fetchError);
-    }
-    
-    console.log(`Found ${callRecords?.length || 0} call records for phone ${to}`);
-    
-    // Try to find by CallSid in notes first, then fall back to most recent
-    let callData = callRecords?.find(record => callSid && record.notes?.includes(`CallSid:${callSid}`));
-    if (!callData && callRecords && callRecords.length > 0) {
-      callData = callRecords[0];
-      console.log('Using most recent call record');
-    }
+    // Match this leg by CallSid first — phone-only matching crosses wires
+    // when many calls run at once.
+    const callData: any = await findCallForLeg(supabaseAdmin, params as any, '*, clients(*)');
 
     if (!callData) {
       console.error('Call record not found for phone:', to, 'or CallSid:', callSid);
@@ -125,7 +109,7 @@ serve(async (req) => {
   <Pause length="1"/>
   <Say voice="Polly.Joanna-Neural">Please speak your preferred date and time clearly. For example, Monday at 10 A M.</Say>
   <Pause length="1"/>
-  <Record maxLength="20" timeout="3" transcribe="true" transcribeCallback="https://prtvithyqpepdyaglzpg.supabase.co/functions/v1/ai-voice-call-dtmf-appointment"/>
+  <Record maxLength="20" timeout="3" transcribe="true" transcribeCallback="${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-voice-call-dtmf-appointment"/>
   <Say voice="Polly.Joanna-Neural">We did not receive your response. An agent will contact you shortly. Goodbye!</Say>
 </Response>`;
 
@@ -158,7 +142,7 @@ serve(async (req) => {
     const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say voice="Polly.Joanna-Neural">Got it! Checking availability now.</Say>
-  <Redirect method="POST">https://prtvithyqpepdyaglzpg.supabase.co/functions/v1/ai-voice-call-dtmf-appointment-finalize</Redirect>
+  <Redirect method="POST">${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-voice-call-dtmf-appointment-finalize</Redirect>
 </Response>`;
 
     console.log('Sending TwiML redirect to finalize function');
