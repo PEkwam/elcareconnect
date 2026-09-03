@@ -185,9 +185,13 @@ serve(async (req) => {
     if (digit === '9' || !digit || !fb) {
       const nextAttempt = (digit === '9') ? attempt : attempt + 1;
       const langActionUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-voice-call-dtmf-language?attempt=${nextAttempt}`;
-      // Only announce an invalid option when the caller actually pressed a
-      // wrong key. Silence just re-plays the menu (no extra talk time).
-      const message = digit && digit !== '9' ? 'Sorry, that was not a valid option.' : '';
+      // Wrong key → announce invalid option. Silence (no key pressed) → a
+      // gentle "I didn't quite get it" before replaying the menu. After the
+      // repeat, if there is still no response the caller is auto-defaulted
+      // to English by the attempt>=2 guard above.
+      const message = !digit
+        ? "I didn't quite get it."
+        : (digit !== '9' ? 'Sorry, that was not a valid option.' : '');
 
       // Re-use the uploaded IVR menu recording if available
       const { data: ivrRow } = await supabaseAdmin
@@ -208,7 +212,7 @@ serve(async (req) => {
         `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   ${message ? `<Say voice="Polly.Joanna-Neural">${message}</Say>` : ''}
-  <Gather numDigits="1" action="${langActionUrl}" method="POST" timeout="6" actionOnEmptyResult="true">
+  <Gather numDigits="1" action="${langActionUrl}" method="POST" timeout="5" actionOnEmptyResult="true">
     ${ivrTwiml}
   </Gather>
   <Redirect method="POST">${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-voice-call-dtmf-language?attempt=${nextAttempt + 1}</Redirect>
