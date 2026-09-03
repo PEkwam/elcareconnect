@@ -87,13 +87,20 @@ export const AgentStatusWidget = () => {
     }
   };
 
+  // Keep the latest status in a ref so the ticking interval never needs to
+  // re-subscribe the realtime channel (which would drop events).
+  const statusRef = useRef<AgentStatusData | null>(null);
+  useEffect(() => {
+    statusRef.current = status;
+  }, [status]);
+
   useEffect(() => {
     if (!user?.id) return;
 
     fetchStatus();
 
     const channel = supabase
-      .channel("agent-status-widget")
+      .channel(`agent-status-widget-${user.id}`)
       .on(
         "postgres_changes",
         {
@@ -109,14 +116,14 @@ export const AgentStatusWidget = () => {
       .subscribe();
 
     const interval = setInterval(() => {
-      setSessionDuration((prev) => {
-        if (!status || status.status === "offline") return "0h 0m";
-        return status.session_started_at ? formatDuration(status.session_started_at) : prev;
-      });
-      setStatusDuration((prev) => {
-        if (!status || status.status === "offline") return "";
-        return status.current_status_started_at ? formatDuration(status.current_status_started_at) : prev;
-      });
+      const s = statusRef.current;
+      if (!s || s.status === "offline") {
+        setSessionDuration("0h 0m");
+        setStatusDuration("");
+        return;
+      }
+      if (s.session_started_at) setSessionDuration(formatDuration(s.session_started_at));
+      if (s.current_status_started_at) setStatusDuration(formatDuration(s.current_status_started_at));
     }, 15000);
 
     return () => {
@@ -124,7 +131,8 @@ export const AgentStatusWidget = () => {
       clearInterval(interval);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, status?.session_started_at, status?.current_status_started_at, status?.status]);
+  }, [user?.id]);
+
 
   const updateStatus = async (newStatus: string, breakType?: string) => {
     if (!user?.email || !user?.id) return;

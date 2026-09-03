@@ -171,10 +171,26 @@ const CallTransferSystem = () => {
       return;
     }
 
-    // Verify agent has the agent role
+    // Verify the SELECTED agent actually holds the agent role
+    const { data: agentProfile, error: profileError } = await supabase
+      .from("profiles")
+      .select("user_id")
+      .eq("email", selectedAgent)
+      .maybeSingle();
+
+    if (profileError || !agentProfile?.user_id) {
+      toast({
+        title: "Error",
+        description: "Could not verify the selected agent's account",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const { data: agentRole, error: roleError } = await supabase
       .from("user_roles")
       .select("role")
+      .eq("user_id", agentProfile.user_id)
       .eq("role", "agent")
       .maybeSingle();
 
