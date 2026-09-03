@@ -15,6 +15,13 @@
       "when": 1788428597369,
       "tag": "0001_revoke_execute_role_check_functions",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788428647452,
+      "tag": "0002_move_role_helpers_to_private_schema",
+      "breakpoints": true
     }
   ]
 }
