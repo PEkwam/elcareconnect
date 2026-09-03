@@ -8,6 +8,34 @@
       "when": 1788189031088,
       "tag": "0000_cron_drain_call_events",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1788428597369,
+      "tag": "0001_revoke_execute_role_check_functions",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788428647452,
+      "tag": "0002_move_role_helpers_to_private_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1788428675117,
+      "tag": "0003_repoint_unqualified_role_helper_policies",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1788428707589,
+      "tag": "0004_repoint_storage_policies_to_private_helpers",
+      "breakpoints": true
     }
   ]
 }
