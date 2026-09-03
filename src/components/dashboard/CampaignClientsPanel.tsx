@@ -131,19 +131,60 @@ export const CampaignClientsPanel = ({ campaignId, script }: Props) => {
   useEffect(() => { load(); }, [campaignId]);
 
   const downloadTemplate = () => {
-    const header = columns.join(",");
-    const example = columns.map(c => {
-      if (c === "client_name") return "Jane Doe";
-      if (c === "phone") return "+233200000000";
-      if (c === "policy_number") return "POL-12345";
-      return `<${c}>`;
-    }).join(",");
-    const csv = `${header}\n${example}\n`;
+    // Build a comprehensive template that includes all standard client detail
+    // columns as well as any script-specific tags, so users can upload clients
+    // with full details without guessing the column names.
+    const detailColumns = [
+      "client_name",
+      "phone",
+      "policy_number",
+      "email",
+      "product_type",
+      "premium_amount",
+      "premium_due_date",
+      "payment_status",
+    ];
+    const tagColumns = scriptTags.filter((t) => !detailColumns.includes(t));
+    const header = [...detailColumns, ...tagColumns].join(",");
+
+    const example1 = [
+      "Jane Doe",
+      "+233200000000",
+      "POL-12345",
+      "jane.doe@example.com",
+      "Life Insurance",
+      "500",
+      "2026-12-31",
+      "current",
+      ...tagColumns.map((c) => `<${c}>`),
+    ].join(",");
+
+    const example2 = [
+      "John Smith",
+      "+233240000001",
+      "POL-67890",
+      "john.smith@example.com",
+      "Health Insurance",
+      "1200",
+      "2026-06-15",
+      "overdue",
+      ...tagColumns.map((c) => ""),
+    ].join(",");
+
+    const note = [
+      "Care Connect - Client Upload Template",
+      "Required: client_name and phone",
+      "Phone: local (0240000000) or international (+233240000000)",
+      "Date format: yyyy-MM-dd (e.g. 2026-12-31)",
+      "payment_status: current | overdue | failed (leave blank if unknown)",
+    ].join("\n# ");
+
+    const csv = `# ${note}\n${header}\n${example1}\n${example2}\n`;
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `campaign-clients-template.csv`;
+    a.download = `care-connect-clients-template.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -489,7 +530,11 @@ export const CampaignClientsPanel = ({ campaignId, script }: Props) => {
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Template auto-includes <code>client_name</code>, <code>phone</code>, <code>policy_number</code> plus every <code>{"{{tag}}"}</code> in your script (excluding the system-handled <code>{"{{client_name}}"}</code>). Re-uploading the same client (by policy number or phone) updates their data. Large files are imported in chunks of {IMPORT_CHUNK_SIZE} rows.
+        Download the template CSV for the exact column layout. It includes all client detail fields
+        (<code>client_name</code>, <code>phone</code>, <code>policy_number</code>, <code>email</code>,
+        <code>product_type</code>, <code>premium_amount</code>, <code>premium_due_date</code>,
+        <code>payment_status</code>) plus any custom <code>{"{{tag}}"}</code> placeholders in your script.
+        Re-uploading the same client (by policy number or phone) updates their data. Large files are imported in chunks of {IMPORT_CHUNK_SIZE} rows.
       </p>
 
       {progress && (
