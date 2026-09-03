@@ -1326,6 +1326,7 @@ export type Database = {
           agent_email: string | null
           ai_summary: string | null
           call_duration: number | null
+          call_language: string | null
           call_recording_url: string | null
           call_status: string | null
           campaign_id: string | null
@@ -1336,6 +1337,7 @@ export type Database = {
           escalation_flagged: boolean | null
           id: string
           is_emergency: boolean | null
+          language_selected_at: string | null
           notes: string | null
           outcome: string | null
           payment_link: string | null
@@ -1354,6 +1356,7 @@ export type Database = {
           agent_email?: string | null
           ai_summary?: string | null
           call_duration?: number | null
+          call_language?: string | null
           call_recording_url?: string | null
           call_status?: string | null
           campaign_id?: string | null
@@ -1364,6 +1367,7 @@ export type Database = {
           escalation_flagged?: boolean | null
           id?: string
           is_emergency?: boolean | null
+          language_selected_at?: string | null
           notes?: string | null
           outcome?: string | null
           payment_link?: string | null
@@ -1382,6 +1386,7 @@ export type Database = {
           agent_email?: string | null
           ai_summary?: string | null
           call_duration?: number | null
+          call_language?: string | null
           call_recording_url?: string | null
           call_status?: string | null
           campaign_id?: string | null
@@ -1392,6 +1397,7 @@ export type Database = {
           escalation_flagged?: boolean | null
           id?: string
           is_emergency?: boolean | null
+          language_selected_at?: string | null
           notes?: string | null
           outcome?: string | null
           payment_link?: string | null
