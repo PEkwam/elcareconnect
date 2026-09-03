@@ -106,155 +106,19 @@ export const CampaignClientsPanel = ({ campaignId, script }: Props) => {
   useEffect(() => { load(); }, [campaignId]);
 
   const downloadTemplate = () => {
-    // Build a comprehensive template that includes all standard client detail
-    // columns as well as any script-specific tags, so users can upload clients
-    // with full details without guessing the column names.
-    const detailColumns = [
-      "client_name",
-      "phone",
-      "policy_number",
-      "email",
-      "product_type",
-      "premium_amount",
-      "premium_due_date",
-      "payment_status",
-    ];
-    const tagColumns = scriptTags.filter((t) => !detailColumns.includes(t));
-    const header = [...detailColumns, ...tagColumns].join(",");
-
-    const example1 = [
-      "Jane Doe",
-      "+233200000000",
-      "POL-12345",
-      "jane.doe@example.com",
-      "Life Insurance",
-      "500",
-      "2026-12-31",
-      "current",
-      ...tagColumns.map((c) => `<${c}>`),
-    ].join(",");
-
-    const example2 = [
-      "John Smith",
-      "+233240000001",
-      "POL-67890",
-      "john.smith@example.com",
-      "Health Insurance",
-      "1200",
-      "2026-06-15",
-      "overdue",
-      ...tagColumns.map((c) => ""),
-    ].join(",");
-
-    const note = [
-      "Care Connect - Client Upload Template",
-      "Required: client_name and phone",
-      "Phone: local (0240000000) or international (+233240000000)",
-      "Date format: yyyy-MM-dd (e.g. 2026-12-31)",
-      "payment_status: current | overdue | failed (leave blank if unknown)",
-    ].join("\n# ");
-
-    const csv = `# ${note}\n${header}\n${example1}\n${example2}\n`;
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `care-connect-clients-template.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const STANDARD_CLIENT_FIELDS = [
-    "client_name", "name", "full_name", "customer_name",
-    "phone", "policy_number",
-    "email",
-    "product_type", "policy_type",
-    "premium_amount", "premium", "cur_premium", "current_premium",
-    "premium_due_date", "due_date",
-    "payment_status",
-  ];
-
-  const parsePremium = (v: any): number | null => {
-    if (v === undefined || v === null) return null;
-    const s = String(v).trim();
-    if (!s) return null;
-    // Handle scientific notation, currency symbols, commas
-    const n = Number(s.replace(/[^0-9.\-eE+]/g, ""));
-    return isNaN(n) ? null : n;
-  };
-
-  const clean = (v: any): string => {
-    const s = (v ?? "").toString().trim();
-    if (/^<[^>]+>$/.test(s)) return "";
-    return s;
-  };
-
-  // Excel mangles long phone numbers into scientific notation like "2.33246E+11".
-  // Re-expand to a digit string and preserve a leading + if present.
-  const normalizePhone = (s: string): string => {
-    if (!s) return s;
-    const hasPlus = s.startsWith("+");
-    const raw = s.replace(/[\s\-()]/g, "");
-    if (/e\+?\d+/i.test(raw)) {
-      const n = Number(raw);
-      if (!isNaN(n)) {
-        const expanded = n.toLocaleString("fullwide", { useGrouping: false, maximumFractionDigits: 0 });
-        return (hasPlus ? "+" : "") + expanded;
-      }
-    }
-    return s;
-  };
-
-  const MONTHS: Record<string, string> = {
-    jan: "01", feb: "02", mar: "03", apr: "04", may: "05", jun: "06",
-    jul: "07", aug: "08", sep: "09", sept: "09", oct: "10", nov: "11", dec: "12",
-  };
-
-  const normalizeDate = (s: string): string | null => {
-    if (!s) return null;
-    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-    // "Apr-26" or "Apr 2026" or "April-2026" → first of month
-    const monMatch = s.match(/^([A-Za-z]{3,9})[\-\s\/](\d{2,4})$/);
-    if (monMatch) {
-      const mon = MONTHS[monMatch[1].toLowerCase().slice(0, monMatch[1].length === 4 && monMatch[1].toLowerCase() === "sept" ? 4 : 3)];
-      if (mon) {
-        let y = monMatch[2];
-        if (y.length === 2) y = "20" + y;
-        return `${y}-${mon}-01`;
-      }
-    }
-    // "26-Apr" or "26 Apr 2026"
-    const dayMon = s.match(/^(\d{1,2})[\-\s\/]([A-Za-z]{3,9})(?:[\-\s\/](\d{2,4}))?$/);
-    if (dayMon) {
-      const mon = MONTHS[dayMon[2].toLowerCase().slice(0, 3)];
-      if (mon) {
-        let y = dayMon[3] || String(new Date().getFullYear());
-        if (y.length === 2) y = "20" + y;
-        return `${y}-${mon}-${dayMon[1].padStart(2, "0")}`;
-      }
-    }
-    // Numeric dd/mm/yyyy or mm/dd/yyyy (assume dd/mm if first > 12)
-    const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
-    if (m) {
-      let [_, a, b, y] = m;
-      let day: string, mon: string;
-      if (parseInt(a) > 12) { day = a.padStart(2, "0"); mon = b.padStart(2, "0"); }
-      else { mon = a.padStart(2, "0"); day = b.padStart(2, "0"); }
-      if (y.length === 2) y = "20" + y;
-      return `${y}-${mon}-${day}`;
-    }
-    const d = new Date(s);
-    if (!isNaN(d.getTime())) {
-      // Use local date parts so the day never shifts due to timezone offset
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    }
-    return null;
+    downloadClientTemplate(scriptTags);
   };
 
   const upsertRow = async (record: Record<string, string>) => {
-    const name = clean(record.client_name || record.name || record.full_name || record.customer_name);
-    const rawPhone = normalizePhone(clean(record.phone));
-    const policy = clean(record.policy_number) || null;
+    const prepared = prepareClientRow(record, 0);
+    const { name, phone, policy_number: policy } = prepared;
+    const email = prepared.email;
+    const productType = prepared.product_type;
+    const premium = prepared.premium_amount;
+    const dueDate = prepared.premium_due_date;
+    const paymentStatus = prepared.payment_status;
+
+    const clientPayload: Record<string, any> = { name, phone };
     if (!name || !rawPhone) throw new Error("client_name and phone are required");
     const phone = toValidE164(rawPhone);
     if (!phone) {
