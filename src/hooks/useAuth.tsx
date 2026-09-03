@@ -83,10 +83,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
+const fallbackAuth: AuthContextType = {
+  user: null,
+  session: null,
+  loading: true,
+  signOut: async () => {
+    await supabase.auth.signOut();
+  },
+};
+
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    // Can happen transiently during HMR when a duplicate module instance is
+    // loaded. Degrade gracefully instead of blanking the whole app.
+    if (import.meta.env.DEV) {
+      console.warn('useAuth used outside AuthProvider — using fallback context');
+    }
+    return fallbackAuth;
   }
   return context;
 };
