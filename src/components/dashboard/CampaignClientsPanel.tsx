@@ -291,8 +291,40 @@ export const CampaignClientsPanel = ({ campaignId, script }: Props) => {
     if (linkErr) throw linkErr;
   };
 
+  // Build the normalized payload the import function expects, without touching the DB.
+  const prepareRow = (record: Record<string, string>, rowNumber: number) => {
+    const name = clean(record.client_name || record.name || record.full_name || record.customer_name);
+    const rawPhone = normalizePhone(clean(record.phone));
+    if (!name || !rawPhone) throw new Error("client_name and phone are required");
+    const phone = toValidE164(rawPhone);
+    if (!phone) {
+      throw new Error(`Invalid phone number "${rawPhone}". Use a valid local (0246052499) or international (+233246052499) number.`);
+    }
+    const paymentStatus = clean(record.payment_status).toLowerCase();
+    const custom: Record<string, string> = {};
+    for (const k of Object.keys(record)) {
+      if (STANDARD_CLIENT_FIELDS.includes(k)) continue;
+      if (record[k] != null && String(record[k]).trim() !== "") custom[k] = String(record[k]).trim();
+    }
+    return {
+      row_number: rowNumber,
+      name,
+      phone,
+      policy_number: clean(record.policy_number) || null,
+      email: clean(record.email) || null,
+      product_type: clean(record.product_type || record.policy_type) || null,
+      premium_amount: parsePremium(clean(record.premium_amount ?? record.premium ?? record.cur_premium ?? record.current_premium)),
+      premium_due_date: normalizeDate(clean(record.premium_due_date || record.due_date)),
+      payment_status: ["current", "overdue", "failed"].includes(paymentStatus) ? paymentStatus : null,
+      custom_data: custom,
+    };
+  };
+
   const handleFile = async (file: File) => {
     setUploading(true);
+    cancelRef.current = false;
+    setImportErrors([]);
+    setProgress(null);
     try {
       let text = await file.text();
       // Strip UTF-8 BOM if present (Excel exports often include it)
@@ -323,21 +355,49 @@ export const CampaignClientsPanel = ({ campaignId, script }: Props) => {
       if (!header.some(h => required.includes(h)) || !header.includes("phone")) {
         throw new Error(`Header must include 'client_name' and 'phone'. Found: ${header.join(", ")}`);
       }
-      let ok = 0, fail = 0;
-      const errors: string[] = [];
+
+      // Normalize every data row first so we can report bad rows without a round trip.
+      const prepared: ReturnType<typeof prepareRow>[] = [];
+      const errors: { row: number; message: string }[] = [];
       for (let i = 1; i < grid.length; i++) {
         const record: Record<string, string> = {};
         header.forEach((h, idx) => { record[h] = (grid[i][idx] ?? "").trim(); });
-        try { await upsertRow(record); ok++; } catch (e: any) { fail++; errors.push(`Row ${i + 1}: ${e.message || e.code || JSON.stringify(e)}`); }
+        try { prepared.push(prepareRow(record, i + 1)); }
+        catch (e: any) { errors.push({ row: i + 1, message: e.message || String(e) }); }
       }
+
+      const total = prepared.length + errors.length;
+      let done = errors.length;
+      let inserted = 0, updated = 0;
+      setProgress({ done, total, inserted, updated, failed: errors.length });
+
+      // Send bounded chunks so any file size works and progress stays live.
+      for (let i = 0; i < prepared.length; i += IMPORT_CHUNK_SIZE) {
+        if (cancelRef.current) break;
+        const chunk = prepared.slice(i, i + IMPORT_CHUNK_SIZE);
+        const { data, error } = await supabase.functions.invoke("campaign-import-clients", {
+          body: { campaign_id: campaignId, rows: chunk },
+        });
+        if (error) {
+          errors.push({ row: chunk[0].row_number, message: `Chunk failed: ${error.message}` });
+        } else {
+          inserted += data?.inserted ?? 0;
+          updated += data?.updated ?? 0;
+          for (const e of (data?.errors ?? [])) errors.push(e);
+        }
+        done += chunk.length;
+        setProgress({ done, total, inserted, updated, failed: errors.length });
+      }
+
+      setImportErrors(errors);
+      const okCount = inserted + updated;
       toast({
-        title: ok ? "Upload complete" : "Upload failed",
-        description: fail
-          ? `${ok} added/updated, ${fail} failed. First error — ${errors[0]}`
-          : `${ok} added/updated`,
-        variant: fail ? "destructive" : "default",
+        title: cancelRef.current ? "Import cancelled" : okCount ? "Import complete" : "Import failed",
+        description: errors.length
+          ? `${okCount} added/updated, ${errors.length} failed. First error — row ${errors[0].row}: ${errors[0].message}`
+          : `${okCount} added/updated (${inserted} new, ${updated} existing)`,
+        variant: errors.length && !okCount ? "destructive" : "default",
       });
-      if (errors.length) console.warn("CSV upload errors:", errors);
       load();
     } catch (e: any) {
       toast({ title: "Upload failed", description: e.message, variant: "destructive" });
@@ -346,6 +406,18 @@ export const CampaignClientsPanel = ({ campaignId, script }: Props) => {
       if (fileRef.current) fileRef.current.value = "";
     }
   };
+
+  const downloadErrorReport = () => {
+    const csv = ["row,error", ...importErrors.map(e => `${e.row},"${String(e.message).replace(/"/g, '""')}"`)].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "campaign-import-errors.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
 
   const addManual = async () => {
     try {
