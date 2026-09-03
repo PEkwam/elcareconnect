@@ -43,6 +43,11 @@ serve(async (req) => {
       `https://api.twilio.com/2010-04-01/Accounts/${sid}/Calls.json?PageSize=10`,
       { headers: { Authorization: auth } },
     );
+    if (!callsRes.ok) {
+      const detail = await callsRes.text();
+      console.error(`Twilio Calls request failed [${callsRes.status}]: ${detail}`);
+      return json({ error: 'Twilio request failed', status: callsRes.status, details: detail }, 502);
+    }
     const calls = await callsRes.json();
 
     const summarized = (calls.calls || []).map((c: any) => ({
@@ -65,7 +70,10 @@ serve(async (req) => {
         `https://api.twilio.com/2010-04-01/Accounts/${sid}/Calls/${latest.sid}/Notifications.json?PageSize=20`,
         { headers: { Authorization: auth } },
       );
-      const nj = await notifRes.json();
+      const nj = notifRes.ok ? await notifRes.json() : {};
+      if (!notifRes.ok) {
+        console.error(`Twilio Notifications request failed [${notifRes.status}]: ${await notifRes.text()}`);
+      }
       notifications = (nj.notifications || []).map((n: any) => ({
         error_code: n.error_code,
         message_text: n.message_text,

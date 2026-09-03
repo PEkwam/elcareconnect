@@ -151,11 +151,14 @@ serve(async (req) => {
       if (!isNewUser) {
         try {
           const functionUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/send-agent-invitation`;
-          await fetch(functionUrl, {
+          const inviteRes = await fetch(functionUrl, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({ email: targetUser.email, invitedBy: user.email || 'Administrator' })
           });
+          if (!inviteRes.ok) {
+            console.error(`send-agent-invitation failed [${inviteRes.status}]: ${await inviteRes.text()}`);
+          }
         } catch (e) { console.error('Error sending invitation email:', e); }
       }
 
