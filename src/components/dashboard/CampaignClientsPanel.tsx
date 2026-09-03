@@ -17,6 +17,14 @@ import { useToast } from "@/components/ui/use-toast";
 import { CalendarIcon, Download, Upload, Trash2, Users, Plus } from "lucide-react";
 import { isReservedSystemTag } from "@/lib/reservedTags";
 import { toValidE164 } from "@/lib/phone";
+import {
+  parseCSV,
+  detectDelimiter,
+  normalizeDelimiter,
+  prepareClientRow,
+  downloadClientTemplate,
+  extractScriptTags,
+} from "@/lib/clientImport";
 
 interface Props {
   campaignId: string;
@@ -43,39 +51,6 @@ interface Row {
 const DEFAULT_COLUMNS = ["client_name", "phone", "policy_number"];
 // Rows sent per request to the import function (server caps at 500).
 const IMPORT_CHUNK_SIZE = 250;
-
-
-function extractTags(script: string): string[] {
-  const re = /\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g;
-  const set = new Set<string>();
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(script)) !== null) set.add(m[1]);
-  return Array.from(set);
-}
-
-function parseCSV(text: string): string[][] {
-  const rows: string[][] = [];
-  let cur: string[] = [];
-  let field = "";
-  let inQuotes = false;
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    if (inQuotes) {
-      if (c === '"' && text[i + 1] === '"') { field += '"'; i++; }
-      else if (c === '"') inQuotes = false;
-      else field += c;
-    } else {
-      if (c === '"') inQuotes = true;
-      else if (c === ",") { cur.push(field); field = ""; }
-      else if (c === "\n" || c === "\r") {
-        if (field.length || cur.length) { cur.push(field); rows.push(cur); cur = []; field = ""; }
-        if (c === "\r" && text[i + 1] === "\n") i++;
-      } else field += c;
-    }
-  }
-  if (field.length || cur.length) { cur.push(field); rows.push(cur); }
-  return rows.filter(r => r.some(v => v.trim() !== ""));
-}
 
 export const CampaignClientsPanel = ({ campaignId, script }: Props) => {
   const { toast } = useToast();
@@ -105,7 +80,7 @@ export const CampaignClientsPanel = ({ campaignId, script }: Props) => {
     })();
   }, []);
 
-  const scriptTags = useMemo(() => extractTags(script).filter(t => !isReservedSystemTag(t) && !["policy_number"].includes(t)), [script]);
+  const scriptTags = useMemo(() => extractScriptTags(script).filter(t => !isReservedSystemTag(t) && !["policy_number"].includes(t)), [script]);
   const columns = useMemo(() => [...DEFAULT_COLUMNS, ...scriptTags], [scriptTags]);
   // Manual form always offers product type and due date, sourced from the catalog/standard fields
   const manualColumns = useMemo(() => {
@@ -131,175 +106,24 @@ export const CampaignClientsPanel = ({ campaignId, script }: Props) => {
   useEffect(() => { load(); }, [campaignId]);
 
   const downloadTemplate = () => {
-    // Build a comprehensive template that includes all standard client detail
-    // columns as well as any script-specific tags, so users can upload clients
-    // with full details without guessing the column names.
-    const detailColumns = [
-      "client_name",
-      "phone",
-      "policy_number",
-      "email",
-      "product_type",
-      "premium_amount",
-      "premium_due_date",
-      "payment_status",
-    ];
-    const tagColumns = scriptTags.filter((t) => !detailColumns.includes(t));
-    const header = [...detailColumns, ...tagColumns].join(",");
-
-    const example1 = [
-      "Jane Doe",
-      "+233200000000",
-      "POL-12345",
-      "jane.doe@example.com",
-      "Life Insurance",
-      "500",
-      "2026-12-31",
-      "current",
-      ...tagColumns.map((c) => `<${c}>`),
-    ].join(",");
-
-    const example2 = [
-      "John Smith",
-      "+233240000001",
-      "POL-67890",
-      "john.smith@example.com",
-      "Health Insurance",
-      "1200",
-      "2026-06-15",
-      "overdue",
-      ...tagColumns.map((c) => ""),
-    ].join(",");
-
-    const note = [
-      "Care Connect - Client Upload Template",
-      "Required: client_name and phone",
-      "Phone: local (0240000000) or international (+233240000000)",
-      "Date format: yyyy-MM-dd (e.g. 2026-12-31)",
-      "payment_status: current | overdue | failed (leave blank if unknown)",
-    ].join("\n# ");
-
-    const csv = `# ${note}\n${header}\n${example1}\n${example2}\n`;
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `care-connect-clients-template.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const STANDARD_CLIENT_FIELDS = [
-    "client_name", "name", "full_name", "customer_name",
-    "phone", "policy_number",
-    "email",
-    "product_type", "policy_type",
-    "premium_amount", "premium", "cur_premium", "current_premium",
-    "premium_due_date", "due_date",
-    "payment_status",
-  ];
-
-  const parsePremium = (v: any): number | null => {
-    if (v === undefined || v === null) return null;
-    const s = String(v).trim();
-    if (!s) return null;
-    // Handle scientific notation, currency symbols, commas
-    const n = Number(s.replace(/[^0-9.\-eE+]/g, ""));
-    return isNaN(n) ? null : n;
-  };
-
-  const clean = (v: any): string => {
-    const s = (v ?? "").toString().trim();
-    if (/^<[^>]+>$/.test(s)) return "";
-    return s;
-  };
-
-  // Excel mangles long phone numbers into scientific notation like "2.33246E+11".
-  // Re-expand to a digit string and preserve a leading + if present.
-  const normalizePhone = (s: string): string => {
-    if (!s) return s;
-    const hasPlus = s.startsWith("+");
-    const raw = s.replace(/[\s\-()]/g, "");
-    if (/e\+?\d+/i.test(raw)) {
-      const n = Number(raw);
-      if (!isNaN(n)) {
-        const expanded = n.toLocaleString("fullwide", { useGrouping: false, maximumFractionDigits: 0 });
-        return (hasPlus ? "+" : "") + expanded;
-      }
-    }
-    return s;
-  };
-
-  const MONTHS: Record<string, string> = {
-    jan: "01", feb: "02", mar: "03", apr: "04", may: "05", jun: "06",
-    jul: "07", aug: "08", sep: "09", sept: "09", oct: "10", nov: "11", dec: "12",
-  };
-
-  const normalizeDate = (s: string): string | null => {
-    if (!s) return null;
-    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-    // "Apr-26" or "Apr 2026" or "April-2026" → first of month
-    const monMatch = s.match(/^([A-Za-z]{3,9})[\-\s\/](\d{2,4})$/);
-    if (monMatch) {
-      const mon = MONTHS[monMatch[1].toLowerCase().slice(0, monMatch[1].length === 4 && monMatch[1].toLowerCase() === "sept" ? 4 : 3)];
-      if (mon) {
-        let y = monMatch[2];
-        if (y.length === 2) y = "20" + y;
-        return `${y}-${mon}-01`;
-      }
-    }
-    // "26-Apr" or "26 Apr 2026"
-    const dayMon = s.match(/^(\d{1,2})[\-\s\/]([A-Za-z]{3,9})(?:[\-\s\/](\d{2,4}))?$/);
-    if (dayMon) {
-      const mon = MONTHS[dayMon[2].toLowerCase().slice(0, 3)];
-      if (mon) {
-        let y = dayMon[3] || String(new Date().getFullYear());
-        if (y.length === 2) y = "20" + y;
-        return `${y}-${mon}-${dayMon[1].padStart(2, "0")}`;
-      }
-    }
-    // Numeric dd/mm/yyyy or mm/dd/yyyy (assume dd/mm if first > 12)
-    const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
-    if (m) {
-      let [_, a, b, y] = m;
-      let day: string, mon: string;
-      if (parseInt(a) > 12) { day = a.padStart(2, "0"); mon = b.padStart(2, "0"); }
-      else { mon = a.padStart(2, "0"); day = b.padStart(2, "0"); }
-      if (y.length === 2) y = "20" + y;
-      return `${y}-${mon}-${day}`;
-    }
-    const d = new Date(s);
-    if (!isNaN(d.getTime())) {
-      // Use local date parts so the day never shifts due to timezone offset
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    }
-    return null;
+    downloadClientTemplate(scriptTags);
   };
 
   const upsertRow = async (record: Record<string, string>) => {
-    const name = clean(record.client_name || record.name || record.full_name || record.customer_name);
-    const rawPhone = normalizePhone(clean(record.phone));
-    const policy = clean(record.policy_number) || null;
-    if (!name || !rawPhone) throw new Error("client_name and phone are required");
+    const prepared = prepareClientRow(record, 0);
+    const { name, phone: rawPhone, policy_number: policy } = prepared;
     const phone = toValidE164(rawPhone);
     if (!phone) {
       throw new Error(`Invalid phone number "${rawPhone}". Use a valid local (0246052499) or international (+233246052499) number.`);
     }
 
-    const email = clean(record.email) || null;
-    // Accept either product_type or policy_type as the product/policy descriptor
-    const productType = clean(record.product_type || record.policy_type) || null;
-    const premium = parsePremium(clean(record.premium_amount ?? record.premium ?? record.cur_premium ?? record.current_premium));
-    const dueDate = normalizeDate(clean(record.premium_due_date || record.due_date));
-    const paymentStatus = clean(record.payment_status) || null;
-
     const clientPayload: Record<string, any> = { name, phone };
     if (policy) clientPayload.policy_number = policy;
-    if (email) clientPayload.email = email;
-    if (productType) clientPayload.product_type = productType;
-    if (premium !== null) clientPayload.premium_amount = premium;
-    if (dueDate) clientPayload.premium_due_date = dueDate;
-    if (paymentStatus) clientPayload.payment_status = paymentStatus;
+    if (prepared.email) clientPayload.email = prepared.email;
+    if (prepared.product_type) clientPayload.product_type = prepared.product_type;
+    if (prepared.premium_amount !== null) clientPayload.premium_amount = prepared.premium_amount;
+    if (prepared.premium_due_date) clientPayload.premium_due_date = prepared.premium_due_date;
+    if (prepared.payment_status) clientPayload.payment_status = prepared.payment_status;
 
     // Find client by policy_number or phone, else create
     let clientId: string | null = null;
@@ -325,17 +149,10 @@ export const CampaignClientsPanel = ({ campaignId, script }: Props) => {
       await supabase.from("clients").update(clientPayload).eq("id", clientId);
     }
 
-    // Custom tag data — exclude anything synced into the clients table
-    const custom: Record<string, string> = {};
-    for (const k of Object.keys(record)) {
-      if (STANDARD_CLIENT_FIELDS.includes(k)) continue;
-      if (record[k] != null && String(record[k]).trim() !== "") custom[k] = String(record[k]).trim();
-    }
-
     const { error: linkErr } = await (supabase as any)
       .from("campaign_clients")
       .upsert(
-        { campaign_id: campaignId, client_id: clientId, custom_data: custom },
+        { campaign_id: campaignId, client_id: clientId, custom_data: prepared.custom_data },
         { onConflict: "campaign_id,client_id" }
       );
     if (linkErr) throw linkErr;
@@ -343,31 +160,12 @@ export const CampaignClientsPanel = ({ campaignId, script }: Props) => {
 
   // Build the normalized payload the import function expects, without touching the DB.
   const prepareRow = (record: Record<string, string>, rowNumber: number) => {
-    const name = clean(record.client_name || record.name || record.full_name || record.customer_name);
-    const rawPhone = normalizePhone(clean(record.phone));
-    if (!name || !rawPhone) throw new Error("client_name and phone are required");
-    const phone = toValidE164(rawPhone);
+    const prepared = prepareClientRow(record, rowNumber);
+    const phone = toValidE164(prepared.phone);
     if (!phone) {
-      throw new Error(`Invalid phone number "${rawPhone}". Use a valid local (0246052499) or international (+233246052499) number.`);
+      throw new Error(`Invalid phone number "${prepared.phone}". Use a valid local (0246052499) or international (+233246052499) number.`);
     }
-    const paymentStatus = clean(record.payment_status).toLowerCase();
-    const custom: Record<string, string> = {};
-    for (const k of Object.keys(record)) {
-      if (STANDARD_CLIENT_FIELDS.includes(k)) continue;
-      if (record[k] != null && String(record[k]).trim() !== "") custom[k] = String(record[k]).trim();
-    }
-    return {
-      row_number: rowNumber,
-      name,
-      phone,
-      policy_number: clean(record.policy_number) || null,
-      email: clean(record.email) || null,
-      product_type: clean(record.product_type || record.policy_type) || null,
-      premium_amount: parsePremium(clean(record.premium_amount ?? record.premium ?? record.cur_premium ?? record.current_premium)),
-      premium_due_date: normalizeDate(clean(record.premium_due_date || record.due_date)),
-      payment_status: ["current", "overdue", "failed"].includes(paymentStatus) ? paymentStatus : null,
-      custom_data: custom,
-    };
+    return { ...prepared, phone };
   };
 
   const handleFile = async (file: File) => {
@@ -380,24 +178,8 @@ export const CampaignClientsPanel = ({ campaignId, script }: Props) => {
       // Strip UTF-8 BOM if present (Excel exports often include it)
       if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
       // Auto-detect delimiter: some locales (and Excel) save with semicolons or tabs
-      const firstLine = text.split(/\r?\n/)[0] || "";
-      const commaCount = (firstLine.match(/,/g) || []).length;
-      const semiCount = (firstLine.match(/;/g) || []).length;
-      const tabCount = (firstLine.match(/\t/g) || []).length;
-      let delim = ",";
-      if (semiCount > commaCount && semiCount >= tabCount) delim = ";";
-      else if (tabCount > commaCount) delim = "\t";
-      if (delim !== ",") {
-        // Normalize to comma for parseCSV (only outside quotes)
-        let out = ""; let inQ = false;
-        for (let i = 0; i < text.length; i++) {
-          const ch = text[i];
-          if (ch === '"') { inQ = !inQ; out += ch; }
-          else if (ch === delim && !inQ) out += ",";
-          else out += ch;
-        }
-        text = out;
-      }
+      const delim = detectDelimiter(text);
+      text = normalizeDelimiter(text, delim);
       const grid = parseCSV(text);
       if (grid.length < 2) throw new Error("CSV is empty or has only a header row");
       const header = grid[0].map(h => h.trim().toLowerCase());

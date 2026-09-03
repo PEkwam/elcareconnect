@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,14 +8,21 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Phone, Calendar, Upload, Edit, Trash2, UserPlus, Megaphone, Filter } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Plus, Phone, Calendar, Upload, Download, Edit, Trash2, UserPlus, Megaphone, Filter } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
-import Papa from "papaparse";
 import { useRealtimeRefresh } from "@/hooks/useRealtimeRefresh";
 import { normalizePhoneE164, isE164 } from "@/lib/phone";
+import {
+  parseCSV,
+  detectDelimiter,
+  normalizeDelimiter,
+  prepareClientRow,
+  downloadClientTemplate,
+} from "@/lib/clientImport";
 
 interface Client {
   id: string;
@@ -92,6 +99,13 @@ const ClientsTab = ({ onStatsUpdate }: ClientsTabProps) => {
   const [addClientTab, setAddClientTab] = useState("basic");
   const [editClientTab, setEditClientTab] = useState("basic");
   const { toast } = useToast();
+
+  // CSV import state (shared robust importer, no campaign link)
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState<{ done: number; total: number; inserted: number; updated: number; failed: number } | null>(null);
+  const [importErrors, setImportErrors] = useState<{ row: number; message: string }[]>([]);
+  const cancelRef = useRef(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const [newClient, setNewClient] = useState({
     name: "",
@@ -536,125 +550,94 @@ const ClientsTab = ({ onStatsUpdate }: ClientsTabProps) => {
     setIsEditClientOpen(true);
   };
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const IMPORT_CHUNK_SIZE = 250;
 
-    if (!file.name.endsWith('.csv')) {
-      toast({
-        title: "Error",
-        description: "Please upload a CSV file",
-        variant: "destructive",
-      });
-      return;
-    }
+  const downloadTemplate = () => {
+    downloadClientTemplate([], "care-connect-clients-template.csv");
+  };
 
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      transformHeader: (h: string) => h.trim().toLowerCase().replace(/\s+/g, "_"),
-      complete: async (results) => {
-        try {
-          setIsLoading(true);
-          const rows = results.data as any[];
+  const downloadErrorReport = () => {
+    const csv = ["row,error", ...importErrors.map((e) => `${e.row},"${String(e.message).replace(/"/g, '""')}"`)].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "clients-import-errors.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
-          const pickName = (r: any) =>
-            r.client_name || r.name || r.full_name || r.customer_name || "";
-          const pickPremium = (r: any) =>
-            r.cur_premium ?? r.premium_amount ?? r.premium ?? r.current_premium;
+  const handleFile = async (file: File) => {
+    setUploading(true);
+    cancelRef.current = false;
+    setImportErrors([]);
+    setProgress(null);
+    try {
+      let text = await file.text();
+      if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+      const delim = detectDelimiter(text);
+      text = normalizeDelimiter(text, delim);
+      const grid = parseCSV(text);
+      if (grid.length < 2) throw new Error("CSV is empty or has only a header row");
+      const header = grid[0].map((h) => h.trim().toLowerCase());
+      const required = ["client_name", "name", "full_name", "customer_name"];
+      if (!header.some((h) => required.includes(h)) || !header.includes("phone")) {
+        throw new Error(`Header must include 'client_name' and 'phone'. Found: ${header.join(", ")}`);
+      }
 
-          const skipped: string[] = [];
-          const clientsToInsert = rows
-            .filter((row: any) => {
-              const phone = String(row.phone ?? "").trim();
-              const policy = String(row.policy_number ?? "").trim();
-              return phone && policy;
-            })
-            .map((row: any) => {
-              const premiumRaw = pickPremium(row);
-              const premium = premiumRaw !== undefined && premiumRaw !== null && String(premiumRaw).trim() !== ""
-                ? parseFloat(String(premiumRaw).replace(/[^0-9.\-]/g, ""))
-                : 0;
-              const rawProduct = String(row.product_type ?? row.product ?? row.policy_type ?? "").trim();
-              let resolvedProduct = "";
-              if (rawProduct) {
-                const lc = rawProduct.toLowerCase();
-                const match = productTypes.find(
-                  (p) => p.name?.toLowerCase() === lc || p.code?.toLowerCase() === lc
-                );
-                resolvedProduct = match ? match.name : rawProduct;
-              }
-              const normalizedPhone = normalizePhoneE164(String(row.phone).trim());
-              return {
-                name: String(pickName(row) || "Unknown").trim(),
-                email: (row.email || "").trim(),
-                phone: normalizedPhone,
-                policy_number: String(row.policy_number).trim(),
-                product_type: resolvedProduct,
-                premium_amount: isNaN(premium) ? 0 : premium,
-                premium_due_date: row.premium_due_date || null,
-                payment_status: row.payment_status || "current",
-              };
-            })
-            .filter((c) => {
-              if (!isE164(c.phone)) {
-                skipped.push(`${c.name} (${c.phone || 'blank'})`);
-                return false;
-              }
-              return true;
-            });
-
-          if (clientsToInsert.length === 0) {
-            toast({
-              title: "Error",
-              description: skipped.length
-                ? `All ${skipped.length} rows had invalid phone numbers. Use international format (e.g. +233241234567).`
-                : "No valid rows. Ensure CSV has 'phone' and 'policy_number' columns with values.",
-              variant: "destructive",
-            });
-            return;
-          }
-
-          if (skipped.length) {
-            toast({
-              title: `Skipped ${skipped.length} row(s)`,
-              description: `Invalid phone numbers: ${skipped.slice(0, 3).join(', ')}${skipped.length > 3 ? '…' : ''}`,
-            });
-          }
-
-          const { error } = await supabase
-            .from("clients")
-            .insert(clientsToInsert);
-
-          if (error) throw error;
-
-          toast({
-            title: "Success",
-            description: `${clientsToInsert.length} clients imported successfully`,
-          });
-
-          setIsUploadDialogOpen(false);
-          fetchClients();
-          onStatsUpdate();
-        } catch (error: any) {
-          console.error("Error importing clients:", error);
-          toast({
-            title: "Error",
-            description: error?.message || "Failed to import clients",
-            variant: "destructive",
-          });
-        } finally {
-          setIsLoading(false);
-        }
-      },
-      error: (error) => {
-        toast({
-          title: "Error",
-          description: "Failed to parse CSV file",
-          variant: "destructive",
+      const prepared: ReturnType<typeof prepareClientRow>[] = [];
+      const errors: { row: number; message: string }[] = [];
+      for (let i = 1; i < grid.length; i++) {
+        const record: Record<string, string> = {};
+        header.forEach((h, idx) => {
+          record[h] = (grid[i][idx] ?? "").trim();
         });
-      },
-    });
+        try {
+          prepared.push(prepareClientRow(record, i + 1));
+        } catch (e: any) {
+          errors.push({ row: i + 1, message: e.message || String(e) });
+        }
+      }
+
+      const total = prepared.length + errors.length;
+      let done = errors.length;
+      let inserted = 0, updated = 0;
+      setProgress({ done, total, inserted, updated, failed: errors.length });
+
+      for (let i = 0; i < prepared.length; i += IMPORT_CHUNK_SIZE) {
+        if (cancelRef.current) break;
+        const chunk = prepared.slice(i, i + IMPORT_CHUNK_SIZE);
+        const { data, error } = await supabase.functions.invoke("campaign-import-clients", {
+          body: { rows: chunk },
+        });
+        if (error) {
+          errors.push({ row: chunk[0].row_number, message: `Chunk failed: ${error.message}` });
+        } else {
+          inserted += data?.inserted ?? 0;
+          updated += data?.updated ?? 0;
+          for (const e of data?.errors ?? []) errors.push(e);
+        }
+        done += chunk.length;
+        setProgress({ done, total, inserted, updated, failed: errors.length });
+      }
+
+      setImportErrors(errors);
+      const okCount = inserted + updated;
+      toast({
+        title: cancelRef.current ? "Import cancelled" : okCount ? "Import complete" : "Import failed",
+        description: errors.length
+          ? `${okCount} added/updated, ${errors.length} failed. First error — row ${errors[0].row}: ${errors[0].message}`
+          : `${okCount} added/updated (${inserted} new, ${updated} existing)`,
+        variant: errors.length && !okCount ? "destructive" : "default",
+      });
+      fetchClients();
+      onStatsUpdate();
+    } catch (e: any) {
+      toast({ title: "Upload failed", description: e.message, variant: "destructive" });
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
   };
 
 
@@ -678,7 +661,7 @@ const ClientsTab = ({ onStatsUpdate }: ClientsTabProps) => {
         <div className="flex justify-between items-center">
           <CardTitle>Client Management</CardTitle>
           <div className="flex gap-2">
-            <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
+            <Dialog open={isUploadDialogOpen} onOpenChange={(open) => { setIsUploadDialogOpen(open); if (!open) { setProgress(null); setImportErrors([]); } }}>
               <DialogTrigger asChild>
                 <Button variant="outline">
                   <Upload className="h-4 w-4 mr-2" />
@@ -687,30 +670,86 @@ const ClientsTab = ({ onStatsUpdate }: ClientsTabProps) => {
               </DialogTrigger>
               <DialogContent className="max-w-md">
                 <DialogHeader>
-                  <DialogTitle>Upload Client Data</DialogTitle>
+                  <DialogTitle>Bulk Import Clients</DialogTitle>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
                   <div className="grid gap-2">
+                    <Label>Template</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Download the template for the exact column layout. It includes all standard client fields
+                      (<code>client_name</code>, <code>phone</code>, <code>policy_number</code>, <code>email</code>,
+                      <code>product_type</code>, <code>premium_amount</code>, <code>premium_due_date</code>,
+                      <code>payment_status</code>). Re-uploading the same client (by policy number or phone) updates their data.
+                    </p>
+                    <Button variant="outline" size="sm" onClick={downloadTemplate} className="w-fit">
+                      <Download className="h-4 w-4 mr-2" />
+                      Download Template
+                    </Button>
+                  </div>
+                  <div className="grid gap-2">
                     <Label htmlFor="csv-file">CSV File</Label>
-                    <Input
+                    <input
+                      ref={fileRef}
                       id="csv-file"
                       type="file"
-                      accept=".csv"
-                      onChange={handleFileUpload}
-                      disabled={isLoading}
+                      accept=".csv,text/csv"
+                      className="hidden"
+                      onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
                     />
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="w-fit"
+                      onClick={() => fileRef.current?.click()}
+                      disabled={uploading}
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      {uploading ? "Importing…" : "Select CSV File"}
+                    </Button>
                     <p className="text-sm text-muted-foreground">
-                      Required columns: <strong>phone</strong>, <strong>policy_number</strong>. Optional: client_name, cur_premium, product_type, email, premium_due_date, payment_status.
+                      Required columns: <strong>client_name</strong>, <strong>phone</strong>. Optional: policy_number, email, product_type, premium_amount, premium_due_date, payment_status.
                     </p>
-
                   </div>
+
+                  {progress && (
+                    <div className="space-y-2 rounded-lg border p-3">
+                      <div className="flex items-center justify-between gap-2 text-sm">
+                        <span className="font-medium">
+                          {uploading ? "Importing…" : "Import finished"} {progress.done}/{progress.total} rows
+                        </span>
+                        <div className="flex items-center gap-2">
+                          {uploading && (
+                            <Button size="sm" variant="outline" onClick={() => { cancelRef.current = true; }}>
+                              Cancel
+                            </Button>
+                          )}
+                          {!uploading && (
+                            <Button size="sm" variant="ghost" onClick={() => { setProgress(null); setImportErrors([]); }}>
+                              Dismiss
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                      <Progress value={progress.total ? (progress.done / progress.total) * 100 : 0} />
+                      <div className="flex gap-3 text-xs text-muted-foreground flex-wrap">
+                        <span>{progress.inserted} new</span>
+                        <span>{progress.updated} updated</span>
+                        <span className={progress.failed ? "text-destructive" : ""}>{progress.failed} failed</span>
+                        {importErrors.length > 0 && (
+                          <button className="underline text-destructive" onClick={downloadErrorReport}>
+                            Download error report
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div className="flex justify-end gap-2">
                   <Button
                     variant="outline"
                     onClick={() => setIsUploadDialogOpen(false)}
                   >
-                    Cancel
+                    Close
                   </Button>
                 </div>
               </DialogContent>
