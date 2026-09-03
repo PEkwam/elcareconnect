@@ -1,1 +1,20 @@
 project_id = "puaynqufnkgkbmaeslsj"
+
+# Twilio webhooks authenticate via X-Twilio-Signature, not a Supabase JWT.
+[functions.ai-voice-call-status]
+verify_jwt = false
+
+[functions.ai-voice-call-bridge-ivr]
+verify_jwt = false
+
+[functions.ai-voice-call-dtmf]
+verify_jwt = false
+
+[functions.ai-voice-call-dtmf-language]
+verify_jwt = false
+
+[functions.ai-voice-call-dtmf-appointment]
+verify_jwt = false
+
+[functions.ai-voice-call-dtmf-appointment-finalize]
+verify_jwt = false
