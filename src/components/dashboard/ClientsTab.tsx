@@ -661,7 +661,7 @@ const ClientsTab = ({ onStatsUpdate }: ClientsTabProps) => {
         <div className="flex justify-between items-center">
           <CardTitle>Client Management</CardTitle>
           <div className="flex gap-2">
-            <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
+            <Dialog open={isUploadDialogOpen} onOpenChange={(open) => { setIsUploadDialogOpen(open); if (!open) { setProgress(null); setImportErrors([]); } }}>
               <DialogTrigger asChild>
                 <Button variant="outline">
                   <Upload className="h-4 w-4 mr-2" />
@@ -670,30 +670,86 @@ const ClientsTab = ({ onStatsUpdate }: ClientsTabProps) => {
               </DialogTrigger>
               <DialogContent className="max-w-md">
                 <DialogHeader>
-                  <DialogTitle>Upload Client Data</DialogTitle>
+                  <DialogTitle>Bulk Import Clients</DialogTitle>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
                   <div className="grid gap-2">
+                    <Label>Template</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Download the template for the exact column layout. It includes all standard client fields
+                      (<code>client_name</code>, <code>phone</code>, <code>policy_number</code>, <code>email</code>,
+                      <code>product_type</code>, <code>premium_amount</code>, <code>premium_due_date</code>,
+                      <code>payment_status</code>). Re-uploading the same client (by policy number or phone) updates their data.
+                    </p>
+                    <Button variant="outline" size="sm" onClick={downloadTemplate} className="w-fit">
+                      <Download className="h-4 w-4 mr-2" />
+                      Download Template
+                    </Button>
+                  </div>
+                  <div className="grid gap-2">
                     <Label htmlFor="csv-file">CSV File</Label>
-                    <Input
+                    <input
+                      ref={fileRef}
                       id="csv-file"
                       type="file"
-                      accept=".csv"
-                      onChange={handleFileUpload}
-                      disabled={isLoading}
+                      accept=".csv,text/csv"
+                      className="hidden"
+                      onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
                     />
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="w-fit"
+                      onClick={() => fileRef.current?.click()}
+                      disabled={uploading}
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      {uploading ? "Importing…" : "Select CSV File"}
+                    </Button>
                     <p className="text-sm text-muted-foreground">
-                      Required columns: <strong>phone</strong>, <strong>policy_number</strong>. Optional: client_name, cur_premium, product_type, email, premium_due_date, payment_status.
+                      Required columns: <strong>client_name</strong>, <strong>phone</strong>. Optional: policy_number, email, product_type, premium_amount, premium_due_date, payment_status.
                     </p>
-
                   </div>
+
+                  {progress && (
+                    <div className="space-y-2 rounded-lg border p-3">
+                      <div className="flex items-center justify-between gap-2 text-sm">
+                        <span className="font-medium">
+                          {uploading ? "Importing…" : "Import finished"} {progress.done}/{progress.total} rows
+                        </span>
+                        <div className="flex items-center gap-2">
+                          {uploading && (
+                            <Button size="sm" variant="outline" onClick={() => { cancelRef.current = true; }}>
+                              Cancel
+                            </Button>
+                          )}
+                          {!uploading && (
+                            <Button size="sm" variant="ghost" onClick={() => { setProgress(null); setImportErrors([]); }}>
+                              Dismiss
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                      <Progress value={progress.total ? (progress.done / progress.total) * 100 : 0} />
+                      <div className="flex gap-3 text-xs text-muted-foreground flex-wrap">
+                        <span>{progress.inserted} new</span>
+                        <span>{progress.updated} updated</span>
+                        <span className={progress.failed ? "text-destructive" : ""}>{progress.failed} failed</span>
+                        {importErrors.length > 0 && (
+                          <button className="underline text-destructive" onClick={downloadErrorReport}>
+                            Download error report
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div className="flex justify-end gap-2">
                   <Button
                     variant="outline"
                     onClick={() => setIsUploadDialogOpen(false)}
                   >
-                    Cancel
+                    Close
                   </Button>
                 </div>
               </DialogContent>
