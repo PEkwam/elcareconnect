@@ -39,6 +39,9 @@ interface Row {
 }
 
 const DEFAULT_COLUMNS = ["client_name", "phone", "policy_number"];
+// Rows sent per request to the import function (server caps at 500).
+const IMPORT_CHUNK_SIZE = 250;
+
 
 function extractTags(script: string): string[] {
   const re = /\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g;
