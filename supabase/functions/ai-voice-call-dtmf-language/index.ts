@@ -2,6 +2,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { verifyTwilioRequest } from "../_shared/twilio-verify.ts";
+import { findCallForLeg } from "../_shared/call-lookup.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -205,7 +206,7 @@ serve(async (req) => {
         `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   ${message ? `<Say voice="Polly.Joanna-Neural">${message}</Say>` : ''}
-  <Gather numDigits="1" action="${langActionUrl}" method="POST" timeout="15">
+  <Gather numDigits="1" action="${langActionUrl}" method="POST" timeout="15" actionOnEmptyResult="true">
     ${ivrTwiml}
   </Gather>
   <Redirect method="POST">${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-voice-call-dtmf-language?attempt=${nextAttempt + 1}</Redirect>
@@ -214,40 +215,28 @@ serve(async (req) => {
       );
     }
 
-    // Look up the most recent call for this number to get campaign + client.
-    // Try `To` first (normal direct call); if not found, try `From` (bridged
-    // leg where the client number is the caller); finally fall back to the
-    // most recent in-progress call so we don't break the flow.
+    // Resolve THIS leg's call row. Matching on CallSid first keeps concurrent
+    // calls (and repeat dials to the same number) from crossing wires.
     const from = (params.From as string | undefined) || null;
-    let callRecord: any = null;
-    const tryLookup = async (phone: string) => {
-      const { data } = await supabaseAdmin
-        .from('outbound_calls')
-        .select('id, client_id, campaign_id, clients(*), call_campaigns(*)')
-        .eq('phone_number', phone)
-        .order('created_at', { ascending: false })
-        .limit(1);
-      return data?.[0] || null;
-    };
-    if (to) callRecord = await tryLookup(to);
-    if (!callRecord && from) callRecord = await tryLookup(from);
-    if (!callRecord) {
-      const { data } = await supabaseAdmin
-        .from('outbound_calls')
-        .select('id, client_id, campaign_id, clients(*), call_campaigns(*)')
-        .order('created_at', { ascending: false })
-        .limit(1);
-      callRecord = data?.[0] || null;
-    }
+    const callRecord: any = await findCallForLeg(
+      supabaseAdmin,
+      params as any,
+      'id, client_id, campaign_id, clients(*), call_campaigns(*)',
+    );
     if (callRecord) {
       console.log('Language selected:', fb.code, 'for call', callRecord.id, 'campaign', callRecord.campaign_id);
-      await supabaseAdmin.from('outbound_calls').update({ call_language: fb.code }).eq('id', callRecord.id);
+      const { error: langErr } = await supabaseAdmin
+        .from('outbound_calls')
+        .update({ call_language: fb.code, language_selected_at: new Date().toISOString() })
+        .eq('id', callRecord.id);
+      if (langErr) console.error('Failed to persist call_language:', langErr.message);
       if (callRecord.client_id) {
         await supabaseAdmin.from('clients').update({ preferred_language: fb.code }).eq('id', callRecord.client_id);
       }
     } else {
-      console.warn('No outbound_calls row found for To=', to, 'From=', from);
+      console.warn('No outbound_calls row found for To=', to, 'From=', from, 'CallSid=', callSid);
     }
+
 
     // Look up admin-configured greeting/menu for this language
     const { data: langRow } = await supabaseAdmin
@@ -438,7 +427,7 @@ serve(async (req) => {
     // For interactive medical-booking campaigns, also offer the appointment menu
     const isInteractive = campaign?.type === 'medical_booking';
     const menuTwiml = sayOrPlay(langRow?.menu_audio_url, escapeXml(langRow?.menu_prompt_text || fb.menuPrompt));
-    const mainDtmfAction = `${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-voice-call-dtmf`;
+    const mainDtmfAction = `${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-voice-call-dtmf?lang=${fb.code}`;
 
     // Segments are emitted back-to-back (no <Pause>) so an uploaded recording
     // and a system-spoken tag value sound like one continuous message.
@@ -446,7 +435,7 @@ serve(async (req) => {
       ? `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   ${greetingTwiml}${campaignTwiml}
-  <Gather numDigits="1" action="${mainDtmfAction}" method="POST" timeout="10">
+  <Gather numDigits="1" action="${mainDtmfAction}" method="POST" timeout="10" actionOnEmptyResult="true">
     ${menuTwiml}
   </Gather>
   <Say voice="Polly.Joanna-Neural">We didn't receive your response. We'll call you back. Goodbye!</Say>

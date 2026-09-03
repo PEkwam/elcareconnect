@@ -2,6 +2,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { verifyTwilioRequest } from "../_shared/twilio-verify.ts";
+import { findCallForLeg } from "../_shared/call-lookup.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -123,13 +124,6 @@ serve(async (req) => {
     );
 
     // --- Find call record (same logic as before) ---
-    if (!digit && digit !== '9') {
-      const p = getPrompts('en');
-      return new Response(
-        `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Joanna-Neural">${p.noResponse}</Say></Response>`,
-        { headers: { 'Content-Type': 'text/xml', ...corsHeaders } }
-      );
-    }
 
     if (!clientPhone) {
       return new Response(
@@ -138,64 +132,12 @@ serve(async (req) => {
       );
     }
 
-    // Find the call record - try multiple strategies
-    console.log('Looking up call record for client phone:', clientPhone, 'CallSid:', callSid);
-    
-    let { data: callRecords, error: fetchError } = await supabaseAdmin
-      .from('outbound_calls')
-      .select('*, clients(*)')
-      .eq('phone_number', clientPhone)
-      .order('created_at', { ascending: false })
-      .limit(10);
-    
-    if (fetchError) {
-      console.error('Error fetching call records:', fetchError);
-    }
-    
-    if (!callRecords || callRecords.length === 0) {
-      const phoneVariations = [
-        clientPhone,
-        clientPhone.replace(/^\+/, ''),
-        clientPhone.replace(/^\+?1/, ''),
-        `+${clientPhone}`,
-        `+1${clientPhone.replace(/^\+?1?/, '')}`
-      ];
-      
-      for (const phoneVar of phoneVariations) {
-        const { data: variantRecords } = await supabaseAdmin
-          .from('outbound_calls')
-          .select('*, clients(*)')
-          .eq('phone_number', phoneVar)
-          .order('created_at', { ascending: false })
-          .limit(10);
-        
-        if (variantRecords && variantRecords.length > 0) {
-          callRecords = variantRecords;
-          break;
-        }
-      }
-    }
-    
-    let callData = null;
-    
-    if (callRecords && callRecords.length > 0) {
-      if (callSid) {
-        callData = callRecords.find(record => record.notes?.includes(callSid));
-      }
-      if (!callData) {
-        callData = callRecords.find(record => record.call_status === 'in_progress');
-      }
-      if (!callData) {
-        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-        callData = callRecords.find(record => record.created_at > fiveMinutesAgo);
-      }
-      if (!callData && callRecords.length > 0) {
-        callData = callRecords[0];
-      }
-    }
+    // Resolve this leg by CallSid first (safe under heavy concurrency).
+    const callData: any = await findCallForLeg(supabaseAdmin, params as any, '*, clients(*)');
 
     // Determine language from call record
-    const langCode = callData?.call_language || 'en';
+    const urlLang = new URL(req.url).searchParams.get('lang');
+    const langCode = callData?.call_language || urlLang || callData?.clients?.preferred_language || 'en';
     const prompts = getPrompts(langCode);
 
     if (!callData) {
@@ -209,7 +151,7 @@ serve(async (req) => {
     console.log('Using call record:', callData.id, 'Language:', langCode);
 
     const retryCount = parseInt(callData.notes?.match(/retry_count:(\d+)/)?.[1] || '0');
-    const mainDtmfAction = `${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-voice-call-dtmf`;
+    const mainDtmfAction = `${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-voice-call-dtmf?lang=${langCode}`;
 
     // --- Press 0: Transfer to live agent ---
     if (digit === '0') {
@@ -304,7 +246,7 @@ serve(async (req) => {
 <Response>
   <Say voice="Polly.Joanna-Neural">${prompts.repeatInfo}</Say>
   <Pause length="1"/>
-  <Gather numDigits="1" timeout="10" action="${mainDtmfAction}" method="POST">
+  <Gather numDigits="1" timeout="10" action="${mainDtmfAction}" method="POST" actionOnEmptyResult="true">
     <Say voice="Polly.Joanna-Neural">${prompts.menuPrompt}</Say>
   </Gather>
   <Say voice="Polly.Joanna-Neural">${prompts.noResponse}</Say>
@@ -402,7 +344,7 @@ serve(async (req) => {
 <Response>
   <Say voice="Polly.Joanna-Neural">${prompts.invalidInput}</Say>
   <Pause length="1"/>
-  <Gather numDigits="1" timeout="10" action="${mainDtmfAction}" method="POST">
+  <Gather numDigits="1" timeout="10" action="${mainDtmfAction}" method="POST" actionOnEmptyResult="true">
     <Say voice="Polly.Joanna-Neural">${prompts.menuPrompt}</Say>
   </Gather>
   <Say voice="Polly.Joanna-Neural">${prompts.noResponse}</Say>

@@ -44,41 +44,66 @@ serve(async (req) => {
   const workerId = `w-${crypto.randomUUID().slice(0, 8)}`;
   const stats = { processed: 0, succeeded: 0, retried: 0, failed: 0 };
 
+  // The cron fires once a minute, so a single batch per tick capped throughput
+  // at `concurrency` calls/minute. Instead we run repeated bounded passes for
+  // most of the minute, always re-checking the per-campaign rate budget.
+  const DEADLINE = Date.now() + 50_000;
+  const MAX_PASSES = 20;
+
   try {
     // 1. Release expired locks first.
     await supabase.rpc("reap_campaign_jobs");
 
-    // 2. Iterate running campaign runs.
-    const { data: runs } = await supabase
-      .from("campaign_runs")
-      .select("id, campaign_id, rate_limit_per_minute, concurrency, total, completed, failed")
-      .eq("state", "running");
+    for (let pass = 0; pass < MAX_PASSES && Date.now() < DEADLINE; pass++) {
+      // 2. Iterate running campaign runs.
+      const { data: runs } = await supabase
+        .from("campaign_runs")
+        .select("id, campaign_id, rate_limit_per_minute, concurrency, total, completed, failed")
+        .eq("state", "running");
 
-    for (const run of runs ?? []) {
-      // Rate-limit gate: count calls dispatched in the last 60s for this campaign.
-      const since = new Date(Date.now() - 60_000).toISOString();
-      const { count: recent } = await supabase
-        .from("campaign_jobs")
-        .select("id", { count: "exact", head: true })
-        .eq("campaign_id", run.campaign_id)
-        .gte("updated_at", since)
-        .in("state", ["active", "completed"]);
-      const budget = Math.max(0, (run.rate_limit_per_minute ?? 30) - (recent ?? 0));
-      const batch = Math.min(run.concurrency ?? 5, budget);
-      if (batch <= 0) continue;
+      if (!runs || runs.length === 0) break;
 
-      // 3. Claim and dispatch.
-      const { data: claimed } = await supabase.rpc("claim_campaign_jobs", {
-        _worker: workerId,
-        _limit: batch,
-        _lock_seconds: 180,
-        _campaign: run.campaign_id,
-      });
+      let dispatchedThisPass = 0;
 
-      await Promise.all(
-        (claimed ?? []).map((job: any) => dispatch(supabase, job, stats)),
-      );
+      for (const run of runs) {
+        if (Date.now() >= DEADLINE) break;
+        // Rate-limit gate: count calls dispatched in the last 60s for this campaign.
+        const since = new Date(Date.now() - 60_000).toISOString();
+        const { count: recent } = await supabase
+          .from("campaign_jobs")
+          .select("id", { count: "exact", head: true })
+          .eq("campaign_id", run.campaign_id)
+          .gte("updated_at", since)
+          .in("state", ["active", "completed"]);
+        const budget = Math.max(0, (run.rate_limit_per_minute ?? 30) - (recent ?? 0));
+        const batch = Math.min(run.concurrency ?? 5, budget);
+        if (batch <= 0) continue;
+
+        // 3. Claim and dispatch.
+        const { data: claimed } = await supabase.rpc("claim_campaign_jobs", {
+          _worker: workerId,
+          _limit: batch,
+          _lock_seconds: 180,
+          _campaign: run.campaign_id,
+        });
+
+        if (!claimed || claimed.length === 0) continue;
+        dispatchedThisPass += claimed.length;
+
+        await Promise.all(
+          claimed.map((job: any) => dispatch(supabase, job, stats)),
+        );
+      }
+
+      // Nothing claimable (queue drained or every campaign rate-capped) —
+      // pause briefly so we don't spin the database for the rest of the tick.
+      if (dispatchedThisPass === 0) {
+        if (Date.now() + 5_000 >= DEADLINE) break;
+        await new Promise((r) => setTimeout(r, 5_000));
+      }
     }
+
+
 
     // 4. Mark finished runs.
     const { data: openRuns } = await supabase
