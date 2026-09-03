@@ -16,8 +16,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const setAgentOffline = useCallback(async (userEmail: string | undefined, userId: string | undefined) => {
-    if (!userEmail || !userId) return;
+  const setAgentOffline = useCallback(async (userId: string | undefined) => {
+    if (!userId) return;
     
     try {
       // Check if user has a role that participates in live status tracking
@@ -36,7 +36,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             current_status_started_at: null,
             updated_at: new Date().toISOString(),
           })
-          .eq('agent_email', userEmail);
+          .eq('user_id', userId);
       }
     } catch (error) {
       console.error('Error setting agent offline:', error);
@@ -51,10 +51,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setUser(currentSession?.user ?? null);
         setLoading(false);
         
-        // When user signs out, set agent status to offline
-        if (event === 'SIGNED_OUT' && user?.email && user?.id) {
-          setAgentOffline(user.email, user.id);
-        }
       }
     );
 
@@ -66,12 +62,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     });
 
     return () => subscription.unsubscribe();
-  }, [user?.email, user?.id, setAgentOffline]);
+  }, []);
 
   const signOut = async () => {
     // Set agent offline before signing out
-    if (user?.email && user?.id) {
-      await setAgentOffline(user.email, user.id);
+    if (user?.id) {
+      await setAgentOffline(user.id);
     }
     
     const { error } = await supabase.auth.signOut();
