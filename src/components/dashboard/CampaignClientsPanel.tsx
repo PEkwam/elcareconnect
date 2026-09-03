@@ -17,6 +17,14 @@ import { useToast } from "@/components/ui/use-toast";
 import { CalendarIcon, Download, Upload, Trash2, Users, Plus } from "lucide-react";
 import { isReservedSystemTag } from "@/lib/reservedTags";
 import { toValidE164 } from "@/lib/phone";
+import {
+  parseCSV,
+  detectDelimiter,
+  normalizeDelimiter,
+  prepareClientRow,
+  downloadClientTemplate,
+  extractScriptTags,
+} from "@/lib/clientImport";
 
 interface Props {
   campaignId: string;
@@ -43,39 +51,6 @@ interface Row {
 const DEFAULT_COLUMNS = ["client_name", "phone", "policy_number"];
 // Rows sent per request to the import function (server caps at 500).
 const IMPORT_CHUNK_SIZE = 250;
-
-
-function extractTags(script: string): string[] {
-  const re = /\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g;
-  const set = new Set<string>();
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(script)) !== null) set.add(m[1]);
-  return Array.from(set);
-}
-
-function parseCSV(text: string): string[][] {
-  const rows: string[][] = [];
-  let cur: string[] = [];
-  let field = "";
-  let inQuotes = false;
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    if (inQuotes) {
-      if (c === '"' && text[i + 1] === '"') { field += '"'; i++; }
-      else if (c === '"') inQuotes = false;
-      else field += c;
-    } else {
-      if (c === '"') inQuotes = true;
-      else if (c === ",") { cur.push(field); field = ""; }
-      else if (c === "\n" || c === "\r") {
-        if (field.length || cur.length) { cur.push(field); rows.push(cur); cur = []; field = ""; }
-        if (c === "\r" && text[i + 1] === "\n") i++;
-      } else field += c;
-    }
-  }
-  if (field.length || cur.length) { cur.push(field); rows.push(cur); }
-  return rows.filter(r => r.some(v => v.trim() !== ""));
-}
 
 export const CampaignClientsPanel = ({ campaignId, script }: Props) => {
   const { toast } = useToast();
