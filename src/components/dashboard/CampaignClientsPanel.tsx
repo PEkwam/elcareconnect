@@ -178,24 +178,8 @@ export const CampaignClientsPanel = ({ campaignId, script }: Props) => {
       // Strip UTF-8 BOM if present (Excel exports often include it)
       if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
       // Auto-detect delimiter: some locales (and Excel) save with semicolons or tabs
-      const firstLine = text.split(/\r?\n/)[0] || "";
-      const commaCount = (firstLine.match(/,/g) || []).length;
-      const semiCount = (firstLine.match(/;/g) || []).length;
-      const tabCount = (firstLine.match(/\t/g) || []).length;
-      let delim = ",";
-      if (semiCount > commaCount && semiCount >= tabCount) delim = ";";
-      else if (tabCount > commaCount) delim = "\t";
-      if (delim !== ",") {
-        // Normalize to comma for parseCSV (only outside quotes)
-        let out = ""; let inQ = false;
-        for (let i = 0; i < text.length; i++) {
-          const ch = text[i];
-          if (ch === '"') { inQ = !inQ; out += ch; }
-          else if (ch === delim && !inQ) out += ",";
-          else out += ch;
-        }
-        text = out;
-      }
+      const delim = detectDelimiter(text);
+      text = normalizeDelimiter(text, delim);
       const grid = parseCSV(text);
       if (grid.length < 2) throw new Error("CSV is empty or has only a header row");
       const header = grid[0].map(h => h.trim().toLowerCase());
