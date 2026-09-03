@@ -2,6 +2,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { verifyTwilioRequest } from "../_shared/twilio-verify.ts";
+import { findCallForLeg } from "../_shared/call-lookup.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -426,7 +427,7 @@ serve(async (req) => {
     // For interactive medical-booking campaigns, also offer the appointment menu
     const isInteractive = campaign?.type === 'medical_booking';
     const menuTwiml = sayOrPlay(langRow?.menu_audio_url, escapeXml(langRow?.menu_prompt_text || fb.menuPrompt));
-    const mainDtmfAction = `${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-voice-call-dtmf`;
+    const mainDtmfAction = `${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-voice-call-dtmf?lang=${fb.code}`;
 
     // Segments are emitted back-to-back (no <Pause>) so an uploaded recording
     // and a system-spoken tag value sound like one continuous message.
@@ -434,7 +435,7 @@ serve(async (req) => {
       ? `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   ${greetingTwiml}${campaignTwiml}
-  <Gather numDigits="1" action="${mainDtmfAction}" method="POST" timeout="10">
+  <Gather numDigits="1" action="${mainDtmfAction}" method="POST" timeout="10" actionOnEmptyResult="true">
     ${menuTwiml}
   </Gather>
   <Say voice="Polly.Joanna-Neural">We didn't receive your response. We'll call you back. Goodbye!</Say>
