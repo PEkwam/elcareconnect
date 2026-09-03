@@ -487,8 +487,44 @@ export const CampaignClientsPanel = ({ campaignId, script }: Props) => {
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Template auto-includes <code>client_name</code>, <code>phone</code>, <code>policy_number</code> plus every <code>{"{{tag}}"}</code> in your script (excluding the system-handled <code>{"{{client_name}}"}</code>). Re-uploading the same client (by policy number or phone) updates their data.
+        Template auto-includes <code>client_name</code>, <code>phone</code>, <code>policy_number</code> plus every <code>{"{{tag}}"}</code> in your script (excluding the system-handled <code>{"{{client_name}}"}</code>). Re-uploading the same client (by policy number or phone) updates their data. Large files are imported in chunks of {IMPORT_CHUNK_SIZE} rows.
       </p>
+
+      {progress && (
+        <Card className="border-primary/40">
+          <CardContent className="p-4 space-y-2">
+            <div className="flex items-center justify-between gap-2 text-sm">
+              <span className="font-medium">
+                {uploading ? "Importing…" : "Import finished"} {progress.done}/{progress.total} rows
+              </span>
+              <div className="flex items-center gap-2">
+                {uploading && (
+                  <Button size="sm" variant="outline" onClick={() => { cancelRef.current = true; }}>
+                    Cancel
+                  </Button>
+                )}
+                {!uploading && (
+                  <Button size="sm" variant="ghost" onClick={() => { setProgress(null); setImportErrors([]); }}>
+                    Dismiss
+                  </Button>
+                )}
+              </div>
+            </div>
+            <Progress value={progress.total ? (progress.done / progress.total) * 100 : 0} />
+            <div className="flex gap-3 text-xs text-muted-foreground flex-wrap">
+              <span>{progress.inserted} new</span>
+              <span>{progress.updated} updated</span>
+              <span className={progress.failed ? "text-destructive" : ""}>{progress.failed} failed</span>
+              {importErrors.length > 0 && (
+                <button className="underline text-destructive" onClick={downloadErrorReport}>
+                  Download error report
+                </button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
 
       {manualOpen && (
         <Card className="border-primary/40">
