@@ -550,125 +550,94 @@ const ClientsTab = ({ onStatsUpdate }: ClientsTabProps) => {
     setIsEditClientOpen(true);
   };
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const IMPORT_CHUNK_SIZE = 250;
 
-    if (!file.name.endsWith('.csv')) {
-      toast({
-        title: "Error",
-        description: "Please upload a CSV file",
-        variant: "destructive",
-      });
-      return;
-    }
+  const downloadTemplate = () => {
+    downloadClientTemplate([], "care-connect-clients-template.csv");
+  };
 
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      transformHeader: (h: string) => h.trim().toLowerCase().replace(/\s+/g, "_"),
-      complete: async (results) => {
-        try {
-          setIsLoading(true);
-          const rows = results.data as any[];
+  const downloadErrorReport = () => {
+    const csv = ["row,error", ...importErrors.map((e) => `${e.row},"${String(e.message).replace(/"/g, '""')}"`)].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "clients-import-errors.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
-          const pickName = (r: any) =>
-            r.client_name || r.name || r.full_name || r.customer_name || "";
-          const pickPremium = (r: any) =>
-            r.cur_premium ?? r.premium_amount ?? r.premium ?? r.current_premium;
+  const handleFile = async (file: File) => {
+    setUploading(true);
+    cancelRef.current = false;
+    setImportErrors([]);
+    setProgress(null);
+    try {
+      let text = await file.text();
+      if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+      const delim = detectDelimiter(text);
+      text = normalizeDelimiter(text, delim);
+      const grid = parseCSV(text);
+      if (grid.length < 2) throw new Error("CSV is empty or has only a header row");
+      const header = grid[0].map((h) => h.trim().toLowerCase());
+      const required = ["client_name", "name", "full_name", "customer_name"];
+      if (!header.some((h) => required.includes(h)) || !header.includes("phone")) {
+        throw new Error(`Header must include 'client_name' and 'phone'. Found: ${header.join(", ")}`);
+      }
 
-          const skipped: string[] = [];
-          const clientsToInsert = rows
-            .filter((row: any) => {
-              const phone = String(row.phone ?? "").trim();
-              const policy = String(row.policy_number ?? "").trim();
-              return phone && policy;
-            })
-            .map((row: any) => {
-              const premiumRaw = pickPremium(row);
-              const premium = premiumRaw !== undefined && premiumRaw !== null && String(premiumRaw).trim() !== ""
-                ? parseFloat(String(premiumRaw).replace(/[^0-9.\-]/g, ""))
-                : 0;
-              const rawProduct = String(row.product_type ?? row.product ?? row.policy_type ?? "").trim();
-              let resolvedProduct = "";
-              if (rawProduct) {
-                const lc = rawProduct.toLowerCase();
-                const match = productTypes.find(
-                  (p) => p.name?.toLowerCase() === lc || p.code?.toLowerCase() === lc
-                );
-                resolvedProduct = match ? match.name : rawProduct;
-              }
-              const normalizedPhone = normalizePhoneE164(String(row.phone).trim());
-              return {
-                name: String(pickName(row) || "Unknown").trim(),
-                email: (row.email || "").trim(),
-                phone: normalizedPhone,
-                policy_number: String(row.policy_number).trim(),
-                product_type: resolvedProduct,
-                premium_amount: isNaN(premium) ? 0 : premium,
-                premium_due_date: row.premium_due_date || null,
-                payment_status: row.payment_status || "current",
-              };
-            })
-            .filter((c) => {
-              if (!isE164(c.phone)) {
-                skipped.push(`${c.name} (${c.phone || 'blank'})`);
-                return false;
-              }
-              return true;
-            });
-
-          if (clientsToInsert.length === 0) {
-            toast({
-              title: "Error",
-              description: skipped.length
-                ? `All ${skipped.length} rows had invalid phone numbers. Use international format (e.g. +233241234567).`
-                : "No valid rows. Ensure CSV has 'phone' and 'policy_number' columns with values.",
-              variant: "destructive",
-            });
-            return;
-          }
-
-          if (skipped.length) {
-            toast({
-              title: `Skipped ${skipped.length} row(s)`,
-              description: `Invalid phone numbers: ${skipped.slice(0, 3).join(', ')}${skipped.length > 3 ? '…' : ''}`,
-            });
-          }
-
-          const { error } = await supabase
-            .from("clients")
-            .insert(clientsToInsert);
-
-          if (error) throw error;
-
-          toast({
-            title: "Success",
-            description: `${clientsToInsert.length} clients imported successfully`,
-          });
-
-          setIsUploadDialogOpen(false);
-          fetchClients();
-          onStatsUpdate();
-        } catch (error: any) {
-          console.error("Error importing clients:", error);
-          toast({
-            title: "Error",
-            description: error?.message || "Failed to import clients",
-            variant: "destructive",
-          });
-        } finally {
-          setIsLoading(false);
-        }
-      },
-      error: (error) => {
-        toast({
-          title: "Error",
-          description: "Failed to parse CSV file",
-          variant: "destructive",
+      const prepared: ReturnType<typeof prepareClientRow>[] = [];
+      const errors: { row: number; message: string }[] = [];
+      for (let i = 1; i < grid.length; i++) {
+        const record: Record<string, string> = {};
+        header.forEach((h, idx) => {
+          record[h] = (grid[i][idx] ?? "").trim();
         });
-      },
-    });
+        try {
+          prepared.push(prepareClientRow(record, i + 1));
+        } catch (e: any) {
+          errors.push({ row: i + 1, message: e.message || String(e) });
+        }
+      }
+
+      const total = prepared.length + errors.length;
+      let done = errors.length;
+      let inserted = 0, updated = 0;
+      setProgress({ done, total, inserted, updated, failed: errors.length });
+
+      for (let i = 0; i < prepared.length; i += IMPORT_CHUNK_SIZE) {
+        if (cancelRef.current) break;
+        const chunk = prepared.slice(i, i + IMPORT_CHUNK_SIZE);
+        const { data, error } = await supabase.functions.invoke("campaign-import-clients", {
+          body: { rows: chunk },
+        });
+        if (error) {
+          errors.push({ row: chunk[0].row_number, message: `Chunk failed: ${error.message}` });
+        } else {
+          inserted += data?.inserted ?? 0;
+          updated += data?.updated ?? 0;
+          for (const e of data?.errors ?? []) errors.push(e);
+        }
+        done += chunk.length;
+        setProgress({ done, total, inserted, updated, failed: errors.length });
+      }
+
+      setImportErrors(errors);
+      const okCount = inserted + updated;
+      toast({
+        title: cancelRef.current ? "Import cancelled" : okCount ? "Import complete" : "Import failed",
+        description: errors.length
+          ? `${okCount} added/updated, ${errors.length} failed. First error — row ${errors[0].row}: ${errors[0].message}`
+          : `${okCount} added/updated (${inserted} new, ${updated} existing)`,
+        variant: errors.length && !okCount ? "destructive" : "default",
+      });
+      fetchClients();
+      onStatsUpdate();
+    } catch (e: any) {
+      toast({ title: "Upload failed", description: e.message, variant: "destructive" });
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
   };
 
 
