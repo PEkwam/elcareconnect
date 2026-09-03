@@ -173,16 +173,21 @@ serve(async (req) => {
       );
     }
 
+    // After one replay, any still-unresolved selection defaults to English so
+    // callers never hit a dead end.
+    if ((digit === '9' || !digit || !FALLBACK[digit || '']) && attempt >= 1) {
+      console.log('Max IVR presentations reached — defaulting to English (1)');
+      digit = '1';
+    }
+
     const fb = FALLBACK[digit || ''];
 
-    // Press 9 or invalid → repeat language menu (Recording 3)
+    // Press 9 or invalid/silence → repeat language menu once. The warm
+    // "I didn't quite get it" message is played at most once, only on the
+    // first silence.
     if (digit === '9' || !digit || !fb) {
-      const nextAttempt = (digit === '9') ? attempt : attempt + 1;
+      const nextAttempt = attempt + 1;
       const langActionUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-voice-call-dtmf-language?attempt=${nextAttempt}`;
-      // Wrong key → announce invalid option. Silence (no key pressed) → a
-      // gentle "I didn't quite get it" before replaying the menu. After the
-      // repeat, if there is still no response the caller is auto-defaulted
-      // to English by the attempt>=2 guard above.
       const message = !digit
         ? "I didn't quite get it."
         : (digit !== '9' ? 'Sorry, that was not a valid option.' : '');
@@ -209,11 +214,12 @@ serve(async (req) => {
   <Gather numDigits="1" action="${langActionUrl}" method="POST" timeout="5" actionOnEmptyResult="true">
     ${ivrTwiml}
   </Gather>
-  <Redirect method="POST">${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-voice-call-dtmf-language?attempt=${nextAttempt + 1}</Redirect>
+  <Redirect method="POST">${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-voice-call-dtmf-language?attempt=${nextAttempt}</Redirect>
 </Response>`,
         { headers: { 'Content-Type': 'text/xml', ...corsHeaders } }
       );
     }
+
 
 
     // Resolve THIS leg's call row. Matching on CallSid first keeps concurrent
