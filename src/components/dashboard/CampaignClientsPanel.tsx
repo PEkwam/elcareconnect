@@ -80,7 +80,7 @@ export const CampaignClientsPanel = ({ campaignId, script }: Props) => {
     })();
   }, []);
 
-  const scriptTags = useMemo(() => extractTags(script).filter(t => !isReservedSystemTag(t) && !["policy_number"].includes(t)), [script]);
+  const scriptTags = useMemo(() => extractScriptTags(script).filter(t => !isReservedSystemTag(t) && !["policy_number"].includes(t)), [script]);
   const columns = useMemo(() => [...DEFAULT_COLUMNS, ...scriptTags], [scriptTags]);
   // Manual form always offers product type and due date, sourced from the catalog/standard fields
   const manualColumns = useMemo(() => {
