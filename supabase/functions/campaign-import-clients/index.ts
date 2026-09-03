@@ -194,9 +194,9 @@ const handler = async (req: Request) => {
     }
   }
 
-  // 4. Bulk link to the campaign.
+  // 4. Bulk link to the campaign when a campaign_id is supplied.
   let linked = 0;
-  if (linkIds.length) {
+  if (campaign_id && linkIds.length) {
     const seen = new Set<string>();
     const links = linkIds
       .filter(({ id }) => (seen.has(id) ? false : (seen.add(id), true)))
@@ -208,7 +208,7 @@ const handler = async (req: Request) => {
     else linked = links.length;
   }
 
-  await recordMetric("campaign_import.rows", prepared.length, { campaign_id });
+  await recordMetric("campaign_import.rows", prepared.length, { campaign_id: campaign_id ?? "none" });
 
   return json({
     inserted,
