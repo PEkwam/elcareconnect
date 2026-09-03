@@ -185,7 +185,9 @@ serve(async (req) => {
     if (digit === '9' || !digit || !fb) {
       const nextAttempt = (digit === '9') ? attempt : attempt + 1;
       const langActionUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-voice-call-dtmf-language?attempt=${nextAttempt}`;
-      const message = digit === '9' ? '' : 'Sorry, that was not a valid option.';
+      // Only announce an invalid option when the caller actually pressed a
+      // wrong key. Silence just re-plays the menu (no extra talk time).
+      const message = digit && digit !== '9' ? 'Sorry, that was not a valid option.' : '';
 
       // Re-use the uploaded IVR menu recording if available
       const { data: ivrRow } = await supabaseAdmin
@@ -206,7 +208,7 @@ serve(async (req) => {
         `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   ${message ? `<Say voice="Polly.Joanna-Neural">${message}</Say>` : ''}
-  <Gather numDigits="1" action="${langActionUrl}" method="POST" timeout="15" actionOnEmptyResult="true">
+  <Gather numDigits="1" action="${langActionUrl}" method="POST" timeout="6" actionOnEmptyResult="true">
     ${ivrTwiml}
   </Gather>
   <Redirect method="POST">${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-voice-call-dtmf-language?attempt=${nextAttempt + 1}</Redirect>
@@ -214,6 +216,7 @@ serve(async (req) => {
         { headers: { 'Content-Type': 'text/xml', ...corsHeaders } }
       );
     }
+
 
     // Resolve THIS leg's call row. Matching on CallSid first keeps concurrent
     // calls (and repeat dials to the same number) from crossing wires.
