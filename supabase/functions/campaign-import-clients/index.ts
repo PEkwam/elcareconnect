@@ -28,7 +28,7 @@ const RowSchema = z.object({
 });
 
 const BodySchema = z.object({
-  campaign_id: z.string().uuid(),
+  campaign_id: z.string().uuid().nullable().optional(),
   rows: z.array(RowSchema).min(1).max(500),
 });
 
