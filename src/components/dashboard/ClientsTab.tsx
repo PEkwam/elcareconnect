@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,14 +8,21 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Phone, Calendar, Upload, Edit, Trash2, UserPlus, Megaphone, Filter } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Plus, Phone, Calendar, Upload, Download, Edit, Trash2, UserPlus, Megaphone, Filter } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
-import Papa from "papaparse";
 import { useRealtimeRefresh } from "@/hooks/useRealtimeRefresh";
 import { normalizePhoneE164, isE164 } from "@/lib/phone";
+import {
+  parseCSV,
+  detectDelimiter,
+  normalizeDelimiter,
+  prepareClientRow,
+  downloadClientTemplate,
+} from "@/lib/clientImport";
 
 interface Client {
   id: string;
