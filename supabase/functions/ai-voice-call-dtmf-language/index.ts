@@ -205,7 +205,7 @@ serve(async (req) => {
         `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   ${message ? `<Say voice="Polly.Joanna-Neural">${message}</Say>` : ''}
-  <Gather numDigits="1" action="${langActionUrl}" method="POST" timeout="15">
+  <Gather numDigits="1" action="${langActionUrl}" method="POST" timeout="15" actionOnEmptyResult="true">
     ${ivrTwiml}
   </Gather>
   <Redirect method="POST">${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-voice-call-dtmf-language?attempt=${nextAttempt + 1}</Redirect>
@@ -214,40 +214,28 @@ serve(async (req) => {
       );
     }
 
-    // Look up the most recent call for this number to get campaign + client.
-    // Try `To` first (normal direct call); if not found, try `From` (bridged
-    // leg where the client number is the caller); finally fall back to the
-    // most recent in-progress call so we don't break the flow.
+    // Resolve THIS leg's call row. Matching on CallSid first keeps concurrent
+    // calls (and repeat dials to the same number) from crossing wires.
     const from = (params.From as string | undefined) || null;
-    let callRecord: any = null;
-    const tryLookup = async (phone: string) => {
-      const { data } = await supabaseAdmin
-        .from('outbound_calls')
-        .select('id, client_id, campaign_id, clients(*), call_campaigns(*)')
-        .eq('phone_number', phone)
-        .order('created_at', { ascending: false })
-        .limit(1);
-      return data?.[0] || null;
-    };
-    if (to) callRecord = await tryLookup(to);
-    if (!callRecord && from) callRecord = await tryLookup(from);
-    if (!callRecord) {
-      const { data } = await supabaseAdmin
-        .from('outbound_calls')
-        .select('id, client_id, campaign_id, clients(*), call_campaigns(*)')
-        .order('created_at', { ascending: false })
-        .limit(1);
-      callRecord = data?.[0] || null;
-    }
+    const callRecord: any = await findCallForLeg(
+      supabaseAdmin,
+      params as any,
+      'id, client_id, campaign_id, clients(*), call_campaigns(*)',
+    );
     if (callRecord) {
       console.log('Language selected:', fb.code, 'for call', callRecord.id, 'campaign', callRecord.campaign_id);
-      await supabaseAdmin.from('outbound_calls').update({ call_language: fb.code }).eq('id', callRecord.id);
+      const { error: langErr } = await supabaseAdmin
+        .from('outbound_calls')
+        .update({ call_language: fb.code, language_selected_at: new Date().toISOString() })
+        .eq('id', callRecord.id);
+      if (langErr) console.error('Failed to persist call_language:', langErr.message);
       if (callRecord.client_id) {
         await supabaseAdmin.from('clients').update({ preferred_language: fb.code }).eq('id', callRecord.client_id);
       }
     } else {
-      console.warn('No outbound_calls row found for To=', to, 'From=', from);
+      console.warn('No outbound_calls row found for To=', to, 'From=', from, 'CallSid=', callSid);
     }
+
 
     // Look up admin-configured greeting/menu for this language
     const { data: langRow } = await supabaseAdmin
