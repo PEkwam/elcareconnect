@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
-import { Plus, Phone, Calendar, Upload, Download, Edit, Trash2, UserPlus, Megaphone, Filter } from "lucide-react";
+import { Plus, Phone, Calendar, Upload, Download, Edit, Trash2, UserPlus, Megaphone, Filter, Search, X } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
@@ -86,6 +86,8 @@ const ClientsTab = ({ onStatsUpdate }: ClientsTabProps) => {
   const [campaigns, setCampaigns] = useState<Array<{ id: string; name: string; type: string }>>([]);
   const [assignments, setAssignments] = useState<Record<string, CampaignAssignment[]>>({});
   const [campaignFilter, setCampaignFilter] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
   const [isAddClientOpen, setIsAddClientOpen] = useState(false);
   const [isEditClientOpen, setIsEditClientOpen] = useState(false);
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
@@ -142,6 +144,12 @@ const ClientsTab = ({ onStatsUpdate }: ClientsTabProps) => {
     fetchCampaigns();
     fetchAssignments();
   }, []);
+
+  // Debounced dynamic search — queries the server as you type.
+  useEffect(() => {
+    const t = setTimeout(() => fetchClients(searchQuery), 300);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
 
 
   useRealtimeRefresh(["clients"], () => {
@@ -294,13 +302,24 @@ const ClientsTab = ({ onStatsUpdate }: ClientsTabProps) => {
     }
   };
 
-  const fetchClients = async () => {
+  const fetchClients = async (query?: string) => {
+    const q = (query ?? searchQuery).trim();
     try {
-      const { data, error } = await supabase
+      setIsSearching(q.length > 0);
+      let req = supabase
         .from("clients")
         .select("*")
         .order("created_at", { ascending: false });
 
+      if (q.length > 0) {
+        const escaped = q.replace(/[%_\\]/g, (ch) => `\\${ch}`);
+        const pattern = `%${escaped}%`;
+        req = req.or(
+          `name.ilike.${pattern},phone.ilike.${pattern},policy_number.ilike.${pattern},email.ilike.${pattern}`
+        );
+      }
+
+      const { data, error } = await req;
       if (error) throw error;
       setClients(data || []);
     } catch (error) {
@@ -310,6 +329,8 @@ const ClientsTab = ({ onStatsUpdate }: ClientsTabProps) => {
         description: "Failed to fetch clients",
         variant: "destructive",
       });
+    } finally {
+      setIsSearching(false);
     }
   };
 
@@ -1100,7 +1121,26 @@ const ClientsTab = ({ onStatsUpdate }: ClientsTabProps) => {
       </CardHeader>
       <CardContent>
         <div className="mb-4 flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search name, phone, policy #, email..."
+                className="pl-8 pr-8 w-[280px]"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  aria-label="Clear search"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
             <Filter className="h-4 w-4 text-muted-foreground" />
             <Label className="text-sm text-muted-foreground">Filter by campaign:</Label>
             <Select value={campaignFilter} onValueChange={setCampaignFilter}>
@@ -1117,7 +1157,7 @@ const ClientsTab = ({ onStatsUpdate }: ClientsTabProps) => {
             </Select>
           </div>
           <span className="text-xs text-muted-foreground">
-            {(() => {
+            {isSearching ? "Searching…" : (() => {
               const visible = clients.filter((c) => {
                 if (campaignFilter === "all") return true;
                 const list = assignments[c.id] || [];
