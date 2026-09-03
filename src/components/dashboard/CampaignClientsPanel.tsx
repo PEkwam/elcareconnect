@@ -77,7 +77,11 @@ export const CampaignClientsPanel = ({ campaignId, script }: Props) => {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState<{ done: number; total: number; inserted: number; updated: number; failed: number } | null>(null);
+  const [importErrors, setImportErrors] = useState<{ row: number; message: string }[]>([]);
+  const cancelRef = useRef(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
 
   // Manual add form
   const [manualOpen, setManualOpen] = useState(false);
