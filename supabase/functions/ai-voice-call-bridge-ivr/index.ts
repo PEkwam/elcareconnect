@@ -2,6 +2,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { verifyTwilioRequest } from "../_shared/twilio-verify.ts";
+import { findCallForLeg } from "../_shared/call-lookup.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -34,15 +35,12 @@ serve(async (req) => {
   let campaignOptions: any = null;
   let preferredLanguage: string | null = null;
   try {
-    const to = verify.params.To || null;
-    if (to) {
-      const { data } = await supabaseAdmin
-        .from('outbound_calls')
-        .select('campaign_id, clients(name, preferred_language), call_campaigns(options)')
-        .eq('phone_number', to)
-        .order('created_at', { ascending: false })
-        .limit(1);
-      const row: any = data?.[0];
+    const row: any = await findCallForLeg(
+      supabaseAdmin,
+      verify.params as any,
+      'campaign_id, clients(name, preferred_language), call_campaigns(options)',
+    );
+    if (row) {
       clientName = row?.clients?.name || '';
       preferredLanguage = row?.clients?.preferred_language || null;
       campaignId = row?.campaign_id || null;
@@ -112,7 +110,7 @@ serve(async (req) => {
   const defaultDigit = (preferredLanguage && langToDigit[preferredLanguage]) || '1';
 
   const tailTwiml = playIvrMenu
-    ? `<Gather numDigits="1" action="${langActionUrl}" method="POST" timeout="12">
+    ? `<Gather numDigits="1" action="${langActionUrl}" method="POST" timeout="12" actionOnEmptyResult="true">
     ${ivrTwiml}
   </Gather>
   <Say voice="Polly.Joanna-Neural">No selection received. Connecting you to the agent now.</Say>`
