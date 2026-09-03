@@ -110,7 +110,7 @@ serve(async (req) => {
   const defaultDigit = (preferredLanguage && langToDigit[preferredLanguage]) || '1';
 
   const tailTwiml = playIvrMenu
-    ? `<Gather numDigits="1" action="${langActionUrl}" method="POST" timeout="12" actionOnEmptyResult="true">
+    ? `<Gather numDigits="1" action="${langActionUrl}" method="POST" timeout="6" actionOnEmptyResult="true">
     ${ivrTwiml}
   </Gather>
   <Say voice="Polly.Joanna-Neural">No selection received. Connecting you to the agent now.</Say>`
