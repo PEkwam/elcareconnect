@@ -17,7 +17,8 @@ serve(async (req) => {
     const cronSecret = Deno.env.get('CRON_SECRET') ?? '';
     const provided = req.headers.get('x-cron-secret') ?? '';
     const authHeader = req.headers.get('authorization') ?? '';
-    const isService = authHeader.includes(Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '___');
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    const isService = !!serviceRoleKey && authHeader.trim() === `Bearer ${serviceRoleKey}`;
 
     if (!isService && (!cronSecret || provided !== cronSecret)) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {

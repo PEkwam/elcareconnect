@@ -102,12 +102,15 @@ export const RealtimeAnalyticsDashboard = () => {
         };
       });
 
-      // Get agent performance
-      const agentPerformance = (agents || []).map(agent => ({
-        name: agent.agent_email.split('@')[0],
-        success_rate: (agent.success_rate || 0) * 100,
-        calls: agent.total_calls_handled || 0
-      })).slice(0, 5);
+      // Get top 5 agents by success rate (sort before slicing)
+      const agentPerformance = (agents || [])
+        .map(agent => ({
+          name: (agent.agent_email || '').split('@')[0],
+          success_rate: (agent.success_rate || 0) * 100,
+          calls: agent.total_calls_handled || 0
+        }))
+        .sort((a, b) => b.success_rate - a.success_rate || b.calls - a.calls)
+        .slice(0, 5);
 
       // Calculate average wait time
       const avgWaitTime = queuedCalls?.reduce((sum, call) => 

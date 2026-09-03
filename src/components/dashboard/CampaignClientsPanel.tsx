@@ -219,7 +219,10 @@ export const CampaignClientsPanel = ({ campaignId, script }: Props) => {
       return `${y}-${mon}-${day}`;
     }
     const d = new Date(s);
-    if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+    if (!isNaN(d.getTime())) {
+      // Use local date parts so the day never shifts due to timezone offset
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    }
     return null;
   };
 
@@ -508,12 +511,14 @@ export const CampaignClientsPanel = ({ campaignId, script }: Props) => {
                   let val = fromCustom || (fromClient != null && fromClient !== "" ? String(fromClient) : "");
                   // Format due_date as Month-Year, e.g. "April-2026"
                   if ((t === "due_date" || t === "premium_due_date") && val) {
-                    try {
-                      const d = new Date(val);
-                      if (!isNaN(d.getTime())) {
-                        val = d.toLocaleDateString("en-US", { month: "long", year: "numeric" }).replace(" ", "-");
-                      }
-                    } catch {}
+                    // Parse as a plain calendar date (no timezone shift)
+                    const ymd = /^(\d{4})-(\d{2})-(\d{2})/.exec(val);
+                    const d = ymd
+                      ? new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]))
+                      : new Date(val);
+                    if (!isNaN(d.getTime())) {
+                      val = d.toLocaleDateString("en-US", { month: "long", year: "numeric" }).replace(" ", "-");
+                    }
                   }
                   return (
                     <TableCell key={t} className="text-xs">{val || <span className="text-muted-foreground italic">—</span>}</TableCell>

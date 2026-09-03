@@ -210,7 +210,7 @@ serve(async (req) => {
                       'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({ callId: createdCall.id })
-                  })
+                  }).catch((e) => console.error('ai-voice-call trigger failed:', e))
                 );
               }
             }

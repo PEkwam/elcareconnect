@@ -67,11 +67,15 @@ const SupervisorView = () => {
   // Fetch escalation thresholds
   useEffect(() => {
     const fetchThresholds = async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("escalation_settings")
         .select("warning_threshold_minutes, escalate_threshold_minutes, critical_threshold_minutes")
         .limit(1)
         .maybeSingle();
+      if (error) {
+        console.error("Failed to load escalation thresholds:", error);
+        return;
+      }
       if (data) {
         setThresholds({
           warning: data.warning_threshold_minutes,
@@ -84,28 +88,40 @@ const SupervisorView = () => {
   }, []);
 
   const fetchAgents = useCallback(async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("agent_status")
       .select("*")
       .order("status");
+    if (error) {
+      console.error("Failed to load agents:", error);
+      return;
+    }
     setAgents(data || []);
   }, []);
 
   const fetchQueue = useCallback(async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("call_queue")
       .select("*, clients!inner(name, phone)")
       .order("priority_level", { ascending: false })
       .order("queue_position");
+    if (error) {
+      console.error("Failed to load call queue:", error);
+      return;
+    }
     setQueue(normalizeQueuedCalls(data as any));
   }, []);
 
   const fetchActiveCalls = useCallback(async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("outbound_calls")
       .select("id, phone_number, call_status, agent_email, started_at, priority_level, clients(name)")
       .eq("call_status", "in_progress")
       .order("started_at", { ascending: false });
+    if (error) {
+      console.error("Failed to load active calls:", error);
+      return;
+    }
     setActiveCalls(data || []);
     setLastRefresh(new Date());
   }, []);
