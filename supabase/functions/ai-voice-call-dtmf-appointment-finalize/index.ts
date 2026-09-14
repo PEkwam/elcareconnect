@@ -4,6 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { Resend } from "npm:resend@4.0.0";
 import { verifyTwilioRequest } from "../_shared/twilio-verify.ts";
 import { getAppSecret } from "../_shared/app-secrets.ts";
+import { withNaturalVoice } from "../_shared/voice.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -17,7 +18,7 @@ const getResend = async () => {
   return key ? new Resend(key) : null;
 };
 
-serve(async (req) => {
+serve(withNaturalVoice(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -347,4 +348,4 @@ serve(async (req) => {
       }
     );
   }
-});
+}));

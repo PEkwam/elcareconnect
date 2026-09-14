@@ -2,6 +2,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
+import { naturalizeTwiml } from "../_shared/voice.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -52,13 +53,13 @@ async function makePhoneCall(toNumber: string, _message: string, _campaign: any,
     // Leg 1 → admin mobile. When admin answers, bridge to client AND
     // run the multilingual IVR on the client leg via <Dial><Number url="...">.
     toLeg = settings.admin_bridge_phone;
-    twimlContent = `<?xml version="1.0" encoding="UTF-8"?>
+    twimlContent = await naturalizeTwiml(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say voice="Polly.Joanna-Neural">Connecting you to the client. Please wait while they choose a language.</Say>
   <Dial callerId="${callerId}" answerOnBridge="true" timeout="30">
     <Number url="${bridgeIvrUrl}" method="POST">${toNumber}</Number>
   </Dial>
-</Response>`;
+</Response>`);
   } else {
     // Direct outbound to client — fetch TwiML from the bridge IVR function so
     // the client hears admin-uploaded Recording 1 (intro) + their name +
