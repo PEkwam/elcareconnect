@@ -52,13 +52,13 @@ async function makePhoneCall(toNumber: string, _message: string, _campaign: any,
     // Leg 1 → admin mobile. When admin answers, bridge to client AND
     // run the multilingual IVR on the client leg via <Dial><Number url="...">.
     toLeg = settings.admin_bridge_phone;
-    twimlContent = `<?xml version="1.0" encoding="UTF-8"?>
+    twimlContent = await naturalizeTwiml(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say voice="Polly.Joanna-Neural">Connecting you to the client. Please wait while they choose a language.</Say>
   <Dial callerId="${callerId}" answerOnBridge="true" timeout="30">
     <Number url="${bridgeIvrUrl}" method="POST">${toNumber}</Number>
   </Dial>
-</Response>`;
+</Response>`);
   } else {
     // Direct outbound to client — fetch TwiML from the bridge IVR function so
     // the client hears admin-uploaded Recording 1 (intro) + their name +
