@@ -3,6 +3,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { verifyTwilioRequest } from "../_shared/twilio-verify.ts";
 import { findCallForLeg } from "../_shared/call-lookup.ts";
+import { withNaturalVoice } from "../_shared/voice.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -105,7 +106,7 @@ function applyPlaceholders(template: string, client: any, productMap?: Map<strin
   });
 }
 
-serve(async (req) => {
+serve(withNaturalVoice(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -463,4 +464,4 @@ serve(async (req) => {
       { status: 500, headers: { 'Content-Type': 'text/xml', ...corsHeaders } }
     );
   }
-});
+}));
