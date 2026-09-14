@@ -43,13 +43,13 @@ serve(async (req) => {
     // Force invitedBy to caller identity — never trust client
     const safeInvitedBy = callerEmail || (typeof invitedBy === 'string' ? invitedBy : 'An administrator');
 
-    const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
+    const RESEND_API_KEY = await getAppSecret('RESEND_API_KEY');
     if (!RESEND_API_KEY) {
       console.error('RESEND_API_KEY not configured');
-      return json({ error: 'Email service not configured' }, 500);
+      return json({ error: 'Email service not configured. Add the Resend API key under Setup → Application Secrets.' }, 500);
     }
 
-    const appUrl = 'https://dckcalls.lovable.app';
+    const appUrl = 'https://elcareconnect.lovable.app';
     const emailHtml = `
       <!DOCTYPE html><html><body style="font-family:Arial,sans-serif;color:#333">
         <div style="max-width:600px;margin:0 auto;padding:20px">

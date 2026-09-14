@@ -102,7 +102,14 @@ serve(async (req) => {
     }
 
     // Initialize Resend
-    const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
+    const resendApiKey = await getAppSecret('RESEND_API_KEY');
+    if (!resendApiKey) {
+      return new Response(
+        JSON.stringify({ error: 'Email service not configured. Add the Resend API key under Setup → Application Secrets.' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    const resend = new Resend(resendApiKey);
     
     // Generate payment link (in real implementation, this would be a secure payment gateway link)
     const paymentLink = `https://payments.dck.com/pay?client=${client.id}&amount=${amount || client.premium_amount}&policy=${client.policy_number}`;

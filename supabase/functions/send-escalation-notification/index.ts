@@ -78,12 +78,12 @@ const handler = async (req: Request): Promise<Response> => {
     const results: { email?: boolean; sms?: boolean } = {};
 
     if (notifyViaEmail && supervisorEmails.length > 0) {
-      const resendApiKey = Deno.env.get("RESEND_API_KEY");
+      const resendApiKey = await getAppSecret("RESEND_API_KEY");
       if (resendApiKey) {
         const resend = new Resend(resendApiKey);
         try {
           await resend.emails.send({
-            from: "VoiceLife Alerts <onboarding@resend.dev>",
+            from: "Care Connect Alerts <onboarding@resend.dev>",
             to: supervisorEmails,
             subject: `🚨 Call Escalation Alert - ${clientName}`,
             html: `
@@ -112,9 +112,15 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     if (notifyViaSms && supervisorPhones.length > 0) {
-      const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
-      const authToken = Deno.env.get("TWILIO_AUTH_TOKEN");
-      const fromPhone = Deno.env.get("TWILIO_PHONE_NUMBER");
+      const {
+        TWILIO_ACCOUNT_SID: accountSid,
+        TWILIO_AUTH_TOKEN: authToken,
+        TWILIO_PHONE_NUMBER: fromPhone,
+      } = await getAppSecrets([
+        "TWILIO_ACCOUNT_SID",
+        "TWILIO_AUTH_TOKEN",
+        "TWILIO_PHONE_NUMBER",
+      ] as const);
       if (accountSid && authToken && fromPhone) {
         try {
           for (const phone of supervisorPhones) {

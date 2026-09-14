@@ -34,9 +34,13 @@ serve(async (req) => {
     const { data: ok } = await admin.rpc('is_supervisor_or_admin', { _user_id: claimsData.claims.sub });
     if (!ok) return json({ error: 'Forbidden' }, 403);
 
-    const sid = Deno.env.get('TWILIO_ACCOUNT_SID') || '';
-    const token = Deno.env.get('TWILIO_AUTH_TOKEN') || '';
-    if (!sid || !token) return json({ error: 'Twilio not configured' }, 500);
+    const { TWILIO_ACCOUNT_SID: sid, TWILIO_AUTH_TOKEN: token } = await getAppSecrets([
+      'TWILIO_ACCOUNT_SID',
+      'TWILIO_AUTH_TOKEN',
+    ] as const);
+    if (!sid || !token) {
+      return json({ error: 'Twilio is not configured. Add the credentials under Setup → Application Secrets.' }, 500);
+    }
     const auth = `Basic ${btoa(`${sid}:${token}`)}`;
 
     const callsRes = await fetch(
