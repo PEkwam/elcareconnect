@@ -137,36 +137,35 @@ serve(async (req) => {
           // Add to chat history
           chatHistory.push({ role: 'user', content: userText });
           
-          // Call Google Cloud Gemini API
+          // Call the built-in AI gateway (no third-party key required)
           try {
-            const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GOOGLE_CLOUD_API_KEY}`, {
+            const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
               method: 'POST',
               headers: {
+                Authorization: `Bearer ${LOVABLE_API_KEY}`,
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
-                contents: chatHistory.map(msg => ({
-                  role: msg.role === 'user' ? 'user' : 'model',
-                  parts: [{ text: msg.content }]
-                })),
-                systemInstruction: {
-                  parts: [{ 
-                    text: 'You are a helpful AI assistant for LifeVoice, an AI-powered calling service. You help users with premium payment reminders, appointment scheduling, and general inquiries. Be friendly, professional, and efficient. Always confirm important details before proceeding with any actions.'
-                  }]
-                },
-                generationConfig: {
-                  temperature: 0.7,
-                  maxOutputTokens: 1000
-                }
+                model: 'google/gemini-2.5-flash',
+                messages: [
+                  {
+                    role: 'system',
+                    content: 'You are a helpful AI assistant for Care Connect, an AI-powered calling service. You help users with premium payment reminders, appointment scheduling, and general inquiries. Be friendly, professional, and efficient. Always confirm important details before proceeding with any actions.',
+                  },
+                  ...chatHistory.map(msg => ({
+                    role: msg.role === 'user' ? 'user' : 'assistant',
+                    content: msg.content,
+                  })),
+                ],
               }),
             });
 
-            if (!geminiResponse.ok) {
-              throw new Error(`Google Cloud API error: ${await geminiResponse.text()}`);
+            if (!aiResponse.ok) {
+              throw new Error(`AI gateway error [${aiResponse.status}]: ${await aiResponse.text()}`);
             }
 
-            const result = await geminiResponse.json();
-            const assistantResponse = result.candidates[0].content.parts[0].text;
+            const result = await aiResponse.json();
+            const assistantResponse = result.choices?.[0]?.message?.content ?? '';
             
             // Add to chat history
             chatHistory.push({ role: 'assistant', content: assistantResponse });
