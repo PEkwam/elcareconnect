@@ -289,16 +289,15 @@ serve(async (req) => {
     }
 
     // Send confirmation email if client has email
-    const resendApiKey = Deno.env.get('RESEND_API_KEY');
-    console.log('RESEND_API_KEY configured:', !!resendApiKey);
-    
-    if (email && email.includes('@')) {
-      console.log('Attempting to send email to:', email);
-      console.log('Using Resend with key present:', !!resendApiKey);
-      
+    const resend = await getResend();
+    console.log('Resend configured:', !!resend);
+
+    if (email && email.includes('@') && resend) {
+      console.log('Attempting to send appointment confirmation email');
+
       try {
         const emailResult = await resend.emails.send({
-          from: 'DCK Medical <onboarding@resend.dev>',
+          from: 'Care Connect <onboarding@resend.dev>',
           to: [email],
           subject: 'Medical Appointment Confirmation',
           html: `
