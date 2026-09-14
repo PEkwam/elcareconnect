@@ -3,6 +3,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { Resend } from "npm:resend@4.0.0";
 import { verifyTwilioRequest } from "../_shared/twilio-verify.ts";
+import { getAppSecret } from "../_shared/app-secrets.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',

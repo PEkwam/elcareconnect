@@ -2,6 +2,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { Resend } from "npm:resend@4.0.0";
+import { getAppSecret } from "../_shared/app-secrets.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
