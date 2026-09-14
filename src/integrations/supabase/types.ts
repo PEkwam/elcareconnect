@@ -1919,6 +1919,7 @@ export type Database = {
         Args: { _month: string }
         Returns: undefined
       }
+      dispatch_campaign_worker: { Args: never; Returns: undefined }
       get_agent_daily_performance: {
         Args: { _from?: string; _to?: string }
         Returns: {

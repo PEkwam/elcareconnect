@@ -3,13 +3,19 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { Resend } from "npm:resend@4.0.0";
 import { verifyTwilioRequest } from "../_shared/twilio-verify.ts";
+import { getAppSecret } from "../_shared/app-secrets.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-twilio-signature',
 };
 
-const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+// Resend is constructed lazily so the admin-managed key (Setup → Application
+// Secrets) is picked up at request time rather than cold-start time.
+const getResend = async () => {
+  const key = await getAppSecret("RESEND_API_KEY");
+  return key ? new Resend(key) : null;
+};
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -79,52 +85,54 @@ serve(async (req) => {
 
     console.log('Processing appointment with preference:', appointmentPreference);
 
-    // Use Gemini to parse appointment date/time with JSON output mode
-    console.log('Calling Gemini to parse appointment preference:', appointmentPreference);
-    
-    const geminiApiKey = Deno.env.get('GOOGLE_CLOUD_API_KEY');
-    if (!geminiApiKey) {
-      console.error('GOOGLE_CLOUD_API_KEY not configured');
-    }
-    
+    // Parse the spoken/keyed appointment preference into a concrete date+time
+    // using the built-in AI gateway (no third-party key required).
+    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
     const today = new Date();
-    const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          parts: [{
-            text: `Parse appointment: "${appointmentPreference}". Today: ${today.toISOString().split('T')[0]}. Return only: {"date":"YYYY-MM-DD","time":"HH:MM"}`
-          }]
-        }],
-        generationConfig: { 
-          temperature: 0.1,
-          responseMimeType: "application/json"
-        }
-      })
-    });
 
     let scheduledDate = new Date();
     let scheduledTime = '09:00';
     let parsedSuccessfully = false;
 
-    if (geminiResponse.ok) {
-      const aiResult = await geminiResponse.json();
-      console.log('Gemini response:', JSON.stringify(aiResult));
-      const aiText = aiResult.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    let aiResponse: Response | null = null;
+    if (lovableApiKey) {
+      aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${lovableApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-2.5-flash',
+          messages: [
+            {
+              role: 'user',
+              content: `Parse appointment: "${appointmentPreference}". Today: ${today.toISOString().split('T')[0]}. Reply with JSON only: {"date":"YYYY-MM-DD","time":"HH:MM"}`,
+            },
+          ],
+          response_format: { type: 'json_object' },
+        }),
+      });
+    } else {
+      console.error('LOVABLE_API_KEY not configured; falling back to default appointment slot');
+    }
+
+    if (aiResponse?.ok) {
+      const aiResult = await aiResponse.json();
+      const aiText = aiResult.choices?.[0]?.message?.content ?? '';
       try {
         const parsed = JSON.parse(aiText);
         if (parsed.date && parsed.date !== 'null') {
           scheduledDate = new Date(parsed.date);
           scheduledTime = parsed.time || '09:00';
           parsedSuccessfully = true;
-          console.log('Parsed date from Gemini:', scheduledDate, 'time:', scheduledTime);
+          console.log('Parsed appointment date:', scheduledDate, 'time:', scheduledTime);
         }
       } catch (e) {
         console.error('Could not parse AI date response:', e);
       }
-    } else {
-      console.error('Gemini API error:', await geminiResponse.text());
+    } else if (aiResponse) {
+      console.error(`AI gateway error [${aiResponse.status}]: ${await aiResponse.text()}`);
     }
 
     if (!parsedSuccessfully) {
@@ -283,16 +291,15 @@ serve(async (req) => {
     }
 
     // Send confirmation email if client has email
-    const resendApiKey = Deno.env.get('RESEND_API_KEY');
-    console.log('RESEND_API_KEY configured:', !!resendApiKey);
-    
-    if (email && email.includes('@')) {
-      console.log('Attempting to send email to:', email);
-      console.log('Using Resend with key present:', !!resendApiKey);
-      
+    const resend = await getResend();
+    console.log('Resend configured:', !!resend);
+
+    if (email && email.includes('@') && resend) {
+      console.log('Attempting to send appointment confirmation email');
+
       try {
         const emailResult = await resend.emails.send({
-          from: 'DCK Medical <onboarding@resend.dev>',
+          from: 'Care Connect <onboarding@resend.dev>',
           to: [email],
           subject: 'Medical Appointment Confirmation',
           html: `

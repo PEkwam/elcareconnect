@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { Resend } from "npm:resend@4.0.0";
+import { getAppSecret } from "../_shared/app-secrets.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -121,7 +122,14 @@ serve(async (req) => {
     });
 
     // Send appointment confirmation email
-    const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
+    const resendApiKey = await getAppSecret('RESEND_API_KEY');
+    if (!resendApiKey) {
+      return new Response(
+        JSON.stringify({ error: 'Email service not configured. Add the Resend API key under Setup → Application Secrets.' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    const resend = new Resend(resendApiKey);
     
     const emailResult = await resend.emails.send({
       from: 'DCK Medical Center <appointments@resend.dev>',

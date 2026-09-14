@@ -1,0 +1,2 @@
+-- Analytics materialized views were never refreshed, so dashboards showed stale data.
+SELECT cron.schedule('refresh-analytics-views', '0 * * * *', $cron$SELECT public.refresh_analytics_views();$cron$);

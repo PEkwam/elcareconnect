@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { Resend } from "npm:resend@4.0.0";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
+import { getAppSecret } from "../_shared/app-secrets.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -102,7 +103,14 @@ serve(async (req) => {
     }
 
     // Initialize Resend
-    const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
+    const resendApiKey = await getAppSecret('RESEND_API_KEY');
+    if (!resendApiKey) {
+      return new Response(
+        JSON.stringify({ error: 'Email service not configured. Add the Resend API key under Setup → Application Secrets.' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    const resend = new Resend(resendApiKey);
     
     // Generate payment link (in real implementation, this would be a secure payment gateway link)
     const paymentLink = `https://payments.dck.com/pay?client=${client.id}&amount=${amount || client.premium_amount}&policy=${client.policy_number}`;
