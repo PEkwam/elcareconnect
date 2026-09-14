@@ -9,7 +9,12 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-twilio-signature',
 };
 
-const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+// Resend is constructed lazily so the admin-managed key (Setup → Application
+// Secrets) is picked up at request time rather than cold-start time.
+const getResend = async () => {
+  const key = await getAppSecret("RESEND_API_KEY");
+  return key ? new Resend(key) : null;
+};
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {

@@ -159,7 +159,9 @@ serve(async (req) => {
     // Send appointment confirmation email
     if (client.email) {
       try {
-        const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
+        const resendApiKey = await getAppSecret('RESEND_API_KEY');
+        if (!resendApiKey) throw new Error('Email service not configured');
+        const resend = new Resend(resendApiKey);
         
         const appointmentDate = new Date(scheduledDate).toLocaleDateString('en-US', {
           weekday: 'long',

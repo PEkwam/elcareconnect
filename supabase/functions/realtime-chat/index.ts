@@ -69,13 +69,12 @@ serve(async (req) => {
 
     console.log('User authorized with role:', roles?.[0]?.role);
 
-    const GOOGLE_CLOUD_API_KEY = Deno.env.get('GOOGLE_CLOUD_API_KEY');
-    console.log('Google Cloud API Key available:', !!GOOGLE_CLOUD_API_KEY);
-    
-    if (!GOOGLE_CLOUD_API_KEY) {
-      console.error('GOOGLE_CLOUD_API_KEY environment variable is not set');
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+
+    if (!LOVABLE_API_KEY) {
+      console.error('LOVABLE_API_KEY is not set');
       return new Response(
-        JSON.stringify({ error: 'Google Cloud API key not configured' }),
+        JSON.stringify({ error: 'AI service not configured' }),
         {
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
