@@ -43,6 +43,13 @@
       "when": 1788430149839,
       "tag": "0005_add_call_language_and_ivr_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789382976955,
+      "tag": "0006_schedule_campaign_worker_tick",
+      "breakpoints": true
     }
   ]
 }
