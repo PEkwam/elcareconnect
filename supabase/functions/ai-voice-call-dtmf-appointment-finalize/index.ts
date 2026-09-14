@@ -131,8 +131,8 @@ serve(async (req) => {
       } catch (e) {
         console.error('Could not parse AI date response:', e);
       }
-    } else {
-      console.error('Gemini API error:', await geminiResponse.text());
+    } else if (aiResponse) {
+      console.error(`AI gateway error [${aiResponse.status}]: ${await aiResponse.text()}`);
     }
 
     if (!parsedSuccessfully) {
