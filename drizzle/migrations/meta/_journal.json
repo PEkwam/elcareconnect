@@ -50,6 +50,13 @@
       "when": 1789382976955,
       "tag": "0006_schedule_campaign_worker_tick",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1789382986279,
+      "tag": "0007_schedule_analytics_refresh",
+      "breakpoints": true
     }
   ]
 }
