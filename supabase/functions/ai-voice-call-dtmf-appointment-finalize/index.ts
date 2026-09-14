@@ -85,46 +85,48 @@ serve(async (req) => {
 
     console.log('Processing appointment with preference:', appointmentPreference);
 
-    // Use Gemini to parse appointment date/time with JSON output mode
-    console.log('Calling Gemini to parse appointment preference:', appointmentPreference);
-    
-    const geminiApiKey = Deno.env.get('GOOGLE_CLOUD_API_KEY');
-    if (!geminiApiKey) {
-      console.error('GOOGLE_CLOUD_API_KEY not configured');
-    }
-    
+    // Parse the spoken/keyed appointment preference into a concrete date+time
+    // using the built-in AI gateway (no third-party key required).
+    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
     const today = new Date();
-    const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          parts: [{
-            text: `Parse appointment: "${appointmentPreference}". Today: ${today.toISOString().split('T')[0]}. Return only: {"date":"YYYY-MM-DD","time":"HH:MM"}`
-          }]
-        }],
-        generationConfig: { 
-          temperature: 0.1,
-          responseMimeType: "application/json"
-        }
-      })
-    });
 
     let scheduledDate = new Date();
     let scheduledTime = '09:00';
     let parsedSuccessfully = false;
 
-    if (geminiResponse.ok) {
-      const aiResult = await geminiResponse.json();
-      console.log('Gemini response:', JSON.stringify(aiResult));
-      const aiText = aiResult.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    let aiResponse: Response | null = null;
+    if (lovableApiKey) {
+      aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${lovableApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-2.5-flash',
+          messages: [
+            {
+              role: 'user',
+              content: `Parse appointment: "${appointmentPreference}". Today: ${today.toISOString().split('T')[0]}. Reply with JSON only: {"date":"YYYY-MM-DD","time":"HH:MM"}`,
+            },
+          ],
+          response_format: { type: 'json_object' },
+        }),
+      });
+    } else {
+      console.error('LOVABLE_API_KEY not configured; falling back to default appointment slot');
+    }
+
+    if (aiResponse?.ok) {
+      const aiResult = await aiResponse.json();
+      const aiText = aiResult.choices?.[0]?.message?.content ?? '';
       try {
         const parsed = JSON.parse(aiText);
         if (parsed.date && parsed.date !== 'null') {
           scheduledDate = new Date(parsed.date);
           scheduledTime = parsed.time || '09:00';
           parsedSuccessfully = true;
-          console.log('Parsed date from Gemini:', scheduledDate, 'time:', scheduledTime);
+          console.log('Parsed appointment date:', scheduledDate, 'time:', scheduledTime);
         }
       } catch (e) {
         console.error('Could not parse AI date response:', e);
